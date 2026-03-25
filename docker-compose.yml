@@ -6,9 +6,10 @@ services:
       - "3000:80"
     volumes:
       - ./secret-keys:/app/secret-keys:ro
-      - ./scripts:/app/scripts:ro
+      # Mount your custom build scripts (optional, for the Build feature):
+      # - ./scripts:/scripts:ro
       - data:/data
-      - repos:/app/repos
+      - repos:/repos
 
 volumes:
   repos:

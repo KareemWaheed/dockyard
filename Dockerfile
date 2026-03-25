@@ -23,6 +23,10 @@ COPY --from=backend-build /app .
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/http.d/default.conf
 
+# Bundle app-provided scripts
+COPY scripts/aws-sg.sh /scripts/aws-sg.sh
+RUN chmod +x /scripts/aws-sg.sh
+
 EXPOSE 80
 
 CMD ["sh", "-c", "node /app/server.js & nginx -g 'daemon off;'"]
