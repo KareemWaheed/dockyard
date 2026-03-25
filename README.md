@@ -1,3 +1,5 @@
+![Dockyard](https://raw.githubusercontent.com/KareemWaheed/dockyard/master/.github/banner.png)
+
 # Dockyard
 
 A self-hosted web dashboard for managing Docker Compose stacks across multiple remote servers. Restart containers, update image tags, edit environment variables, view logs, and trigger CI/CD builds — all from a single browser tab. Everything runs over SSH; no agent or daemon is needed on the target machines.
@@ -44,7 +46,7 @@ So I built Dockyard: a thin dashboard that sits on top of your existing SSH acce
 
 ## Screenshots
 
-<!-- Add screenshots here -->
+![Dockyard Dashboard](https://raw.githubusercontent.com/KareemWaheed/dockyard/master/.github/banner.png)
 
 ## Quick Start
 
