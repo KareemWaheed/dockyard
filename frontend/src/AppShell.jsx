@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchContainers } from './api';
+import { fetchContainers, fetchSettingsServers } from './api';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DashboardView from './components/DashboardView';
@@ -8,7 +8,6 @@ import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
 import CommandPalette from './components/CommandPalette';
 
-const ENVS = ['dev', 'test', 'stage', 'prod'];
 const POLL_MS = 30000;
 
 export function computeEnvStatuses(containersByEnv, fetchErrorByEnv) {
@@ -25,7 +24,8 @@ export function computeEnvStatuses(containersByEnv, fetchErrorByEnv) {
 }
 
 export default function AppShell() {
-  const [activeEnv, setActiveEnv] = useState('dev');
+  const [envs, setEnvs] = useState([]);
+  const [activeEnv, setActiveEnv] = useState(null);
   const [activeView, setActiveView] = useState('dashboard');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
@@ -37,21 +37,24 @@ export default function AppShell() {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
-  const [containersByEnv, setContainersByEnv] = useState(
-    Object.fromEntries(ENVS.map(e => [e, null]))
-  );
-  const [fetchErrorByEnv, setFetchErrorByEnv] = useState(
-    Object.fromEntries(ENVS.map(e => [e, false]))
-  );
-  const [stacksByEnv, setStacksByEnv] = useState(
-    Object.fromEntries(ENVS.map(e => [e, null]))
-  );
-  const [lastRefreshByEnv, setLastRefreshByEnv] = useState(
-    Object.fromEntries(ENVS.map(e => [e, null]))
-  );
-  const [standaloneByEnv, setStandaloneByEnv] = useState(
-    Object.fromEntries(ENVS.map(e => [e, []]))
-  );
+  const [containersByEnv, setContainersByEnv] = useState({});
+  const [fetchErrorByEnv, setFetchErrorByEnv] = useState({});
+  const [stacksByEnv, setStacksByEnv] = useState({});
+  const [lastRefreshByEnv, setLastRefreshByEnv] = useState({});
+  const [standaloneByEnv, setStandaloneByEnv] = useState({});
+
+  useEffect(() => {
+    fetchSettingsServers().then(servers => {
+      const keys = servers.map(s => s.env_key);
+      setEnvs(keys);
+      setActiveEnv(k => k && keys.includes(k) ? k : keys[0] ?? null);
+      setContainersByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? null])));
+      setFetchErrorByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? false])));
+      setStacksByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? null])));
+      setLastRefreshByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? null])));
+      setStandaloneByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? []])));
+    }).catch(() => {});
+  }, []);
 
   const loadEnvFull = useCallback(async (env) => {
     try {
@@ -69,12 +72,13 @@ export default function AppShell() {
     }
   }, []);
 
-  // Poll all envs on mount; re-poll every POLL_MS
+  // Poll all envs once loaded; re-poll every POLL_MS
   useEffect(() => {
-    ENVS.forEach(env => loadEnvFull(env));
-    const interval = setInterval(() => ENVS.forEach(env => loadEnvFull(env)), POLL_MS);
+    if (envs.length === 0) return;
+    envs.forEach(env => loadEnvFull(env));
+    const interval = setInterval(() => envs.forEach(env => loadEnvFull(env)), POLL_MS);
     return () => clearInterval(interval);
-  }, [loadEnvFull]);
+  }, [loadEnvFull, envs]);
 
   // Keyboard shortcut for palette
   useEffect(() => {
@@ -101,6 +105,7 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <Sidebar
+        envs={envs}
         activeEnv={activeEnv}
         activeView={activeView}
         onEnvChange={handleEnvChange}

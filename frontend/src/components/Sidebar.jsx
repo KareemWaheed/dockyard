@@ -1,7 +1,6 @@
 import React from 'react';
 
-export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChange, envStatuses }) {
-  const envs = ['dev', 'test', 'stage', 'prod'];
+export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChange, envStatuses, envs }) {
 
   const totalConnected = Object.values(envStatuses).filter(s => s !== 'loading' && s !== 'unknown').length;
   const allHealthy = Object.values(envStatuses).every(s => s === 'healthy');
