@@ -1,0 +1,15 @@
+node_modules/
+config.json
+notes.json
+repos/
+frontend/dist/
+*.pem
+*.ppk
+secret-keys/
+.claude/
+.superpowers/
+docs/
+.worktrees/
+data/
+*.bak
+scripts/*build.sh

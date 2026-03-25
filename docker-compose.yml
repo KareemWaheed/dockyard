@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./secret-keys:/app/secret-keys:ro
+      - ./scripts:/app/scripts:ro
+      - data:/app/data
+      - repos:/app/repos
+    environment:
+      - NOTES_PATH=/app/data/notes.json
+    expose:
+      - "3001"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  repos:
+  data:

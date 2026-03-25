@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="32" fill="#0d1117"/>
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="30" stroke="#1e3a5f" stroke-width="1.5" fill="none"/>
+
+  <!-- Server stack lines -->
+  <rect x="14" y="18" width="36" height="8" rx="2" fill="#1a2434" stroke="#1e3a5f" stroke-width="1"/>
+  <rect x="14" y="29" width="36" height="8" rx="2" fill="#1a2434" stroke="#1e3a5f" stroke-width="1"/>
+  <rect x="14" y="40" width="36" height="8" rx="2" fill="#1a2434" stroke="#1e3a5f" stroke-width="1"/>
+
+  <!-- Status dots -->
+  <circle cx="21" cy="22" r="2.5" fill="#22c55e"/>
+  <circle cx="21" cy="33" r="2.5" fill="#22c55e"/>
+  <circle cx="21" cy="44" r="2.5" fill="#ef4444"/>
+
+  <!-- Lightning bolt overlay (center-right) -->
+  <path d="M36 16 L28 33 L34 33 L28 50 L44 29 L37 29 Z"
+        fill="#3b82f6" opacity="0.95"/>
+</svg>

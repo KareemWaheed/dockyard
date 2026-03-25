@@ -1,0 +1,46 @@
+{
+  "awsSg": {
+    "description": "your-name"
+  },
+  "gitlab": {
+    "token": "glpat-YOUR_TOKEN_HERE"
+  },
+  "projects": {
+    "myapp-frontend": {
+      "name": "My Frontend",
+      "repo": "https://gitlab.example.com/myorg/myapp-frontend.git",
+      "buildScript": "frontend-build.sh"
+    },
+    "myapp-backend": {
+      "name": "My Backend",
+      "repo": "https://gitlab.example.com/myorg/myapp-backend.git",
+      "buildScript": "backend-build.sh"
+    }
+  },
+  "servers": {
+    "dev": {
+      "host": "192.168.1.10",
+      "ssh": { "username": "deploy", "password": "your-password" },
+      "composeStacks": [
+        { "name": "App Stack", "path": "/opt/myapp/docker-compose.yml" }
+      ]
+    },
+    "stage": {
+      "host": "203.0.113.10",
+      "dockerCompose": "docker-compose",
+      "ssh": { "username": "deploy", "privateKeyPath": "secret-keys/stage.pem", "passphrase": "" },
+      "composeStacks": [
+        { "name": "App Stack", "path": "/opt/myapp/docker-compose.yml" }
+      ]
+    },
+    "prod": {
+      "host": "203.0.113.20",
+      "dockerCompose": "docker-compose",
+      "ssh": { "username": "deploy", "privateKeyPath": "secret-keys/prod.pem", "passphrase": "" },
+      "composeStacks": [
+        { "name": "App Stack", "path": "/opt/myapp/docker-compose.yml" },
+        { "name": "Admin", "path": "/opt/admin/docker-compose.yml" }
+      ]
+    }
+  }
+}
