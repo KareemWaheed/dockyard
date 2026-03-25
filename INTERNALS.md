@@ -1,4 +1,4 @@
-# Namaa DevOps Dashboard
+# Dockyard
 
 A self-hosted dashboard for managing Docker Compose stacks and CI/CD builds across multiple remote servers (dev, test, stage, prod). All container actions run over SSH — no agent required on the target machine.
 
@@ -28,7 +28,7 @@ Remote Server  (docker / docker compose)
 ### 1. Install
 
 ```bash
-git clone <this-repo> && cd namaa-devops
+git clone <this-repo> && cd dockyard
 npm run install:all
 ```
 
@@ -99,7 +99,7 @@ services:
   backend:
     image: myrepo/backend:prod-14
     labels:
-      - "com.namaa.dashboard.managed=true"
+      - "com.dockyard.managed=true"
 ```
 
 Managed containers get the full action set (update tag, edit env, restart, etc.). Unmanaged containers are visible but dimmed — you can only view logs and env vars.
@@ -137,7 +137,7 @@ docker inspect "standalone1" ...
 The backend then:
 - Parses the JSON output from `docker compose ps` (handles both NDJSON and array format)
 - Merges inspect data (image, env, labels, state) onto each container
-- Marks containers with `com.namaa.dashboard.managed=true` as managed
+- Marks containers with `com.dockyard.managed=true` as managed
 - Returns stacks + standalone containers to the browser
 
 ---
@@ -281,7 +281,7 @@ Fill out the form (name, image, ports, env vars) → Add:
 cat "/path/to/docker-compose.yml"
 
 # 2. Backend appends the new service definition to the YAML
-#    New services get label: com.namaa.dashboard.managed=true
+#    New services get label: com.dockyard.managed=true
 echo '<base64_encoded_content>' | base64 -d > "/path/to/docker-compose.yml"
 
 # 3. Start the new service
@@ -477,7 +477,7 @@ FRONTEND_TAG=fe-22
        image: "myrepo/new-service:latest"
        restart: "always"
        labels:
-         com.namaa.dashboard.managed: "true"
+         com.dockyard.managed: "true"
        ports:
          - "8080:8080"
        environment:
@@ -505,7 +505,7 @@ FRONTEND_TAG=fe-22
 ## Project Structure
 
 ```
-namaa-devops/
+dockyard/
 ├── backend/
 │   ├── server.js               # Express app + WebSocket setup
 │   ├── db.js                   # SQLite init + config.json migration

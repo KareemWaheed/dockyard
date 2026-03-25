@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchProjects, fetchBranches, startBuild, cloneRepo } from '../api';
 
-const RECENT_KEY = 'namaa_build_recent';
+const RECENT_KEY = 'dockyard_build_recent';
 
 function loadRecent() {
   try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || {}; } catch { return {}; }

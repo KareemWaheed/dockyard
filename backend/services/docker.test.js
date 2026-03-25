@@ -15,7 +15,7 @@ console.assert(containers[1].status === 'stopped', 'exited maps to stopped');
 const inspectOutput = JSON.stringify([{
   Config: {
     Image: 'my-frontend:test-r15-s1',
-    Labels: { 'com.namaa.dashboard.managed': 'true' },
+    Labels: { 'com.dockyard.managed': 'true' },
     Env: ['API_URL=http://192.0.2.1:4001/app-api', 'TZ=UTC']
   },
   State: { Status: 'running' }

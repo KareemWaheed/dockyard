@@ -20,7 +20,7 @@ const block = buildServiceBlock({
   restart: 'always',
 });
 console.assert(block.includes('frontend-client2:'), 'block has service name');
-console.assert(block.includes('com.namaa.dashboard.managed: "true"'), 'managed label auto-added');
+console.assert(block.includes('com.dockyard.managed: "true"'), 'managed label auto-added');
 console.assert(block.includes('3001:80'), 'port included');
 
 console.log('compose tests passed');

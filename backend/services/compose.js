@@ -73,7 +73,7 @@ function buildServiceObject(def) {
     container_name: def.name,
     image: def.image,
     restart: def.restart || 'always',
-    labels: { 'com.namaa.dashboard.managed': 'true' },
+    labels: { 'com.dockyard.managed': 'true' },
   };
   if (def.ports?.length) svc.ports = def.ports;
   if (def.environment && Object.keys(def.environment).length) {

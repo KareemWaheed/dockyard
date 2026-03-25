@@ -54,7 +54,7 @@ function parseBatchInspect(output) {
     }
     map[name] = {
       image: item.Config?.Image || '',
-      managed: labels['com.namaa.dashboard.managed'] === 'true',
+      managed: labels['com.dockyard.managed'] === 'true',
       env,
       status: (item.State?.Status || '').toLowerCase().includes('running') ? 'running' : 'stopped',
       labels,

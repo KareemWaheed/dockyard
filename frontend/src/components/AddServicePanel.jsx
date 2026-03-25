@@ -79,7 +79,7 @@ export default function AddServicePanel({ env, stackIdx, stackPath, existingServ
       </Field>
 
       {error && <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 8 }}>{error}</div>}
-      <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>com.namaa.dashboard.managed=true will be added automatically.</div>
+      <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>com.dockyard.managed=true will be added automatically.</div>
       <button onClick={submit} disabled={busy} style={{ marginTop: 12, background: '#1a2e1a', color: 'var(--green)', border: '1px solid #2a4a2a', padding: '6px 20px' }}>
         {busy ? 'Creating…' : 'Create Service ↗'}
       </button>

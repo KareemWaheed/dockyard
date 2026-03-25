@@ -9,7 +9,7 @@ export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChan
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-name">NAMAA</div>
+        <div className="sidebar-logo-name">DOCKYARD</div>
         <div className="sidebar-logo-sub">DEVOPS</div>
       </div>
 
