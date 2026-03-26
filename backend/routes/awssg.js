@@ -7,9 +7,13 @@ const db = require('../db');
 // Streams output via chunked plain text
 router.post('/whitelist', (req, res) => {
   const { env } = req.body;
-  if (!['stage', 'prod'].includes(env)) {
-    return res.status(400).json({ error: 'env must be stage or prod' });
+  if (!env) {
+    return res.status(400).json({ error: 'env is required' });
   }
+
+  const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
+  if (!server.aws_sg_id) return res.status(400).json({ error: `No AWS Security Group configured for ${env}. Set it in Settings → Servers.` });
 
   const awsSgRow = db.prepare("SELECT value_json FROM app_config WHERE key = 'awsSg'").get();
   const awsSg = awsSgRow ? JSON.parse(awsSgRow.value_json) : {};
@@ -19,7 +23,7 @@ router.post('/whitelist', (req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  const proc = spawn('bash', [scriptPath, '-d', description, '-e', env], {
+  const proc = spawn('bash', [scriptPath, '-g', server.aws_sg_id, '-d', description, '-e', env], {
     cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,

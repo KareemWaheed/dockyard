@@ -1,47 +1,39 @@
 #!/bin/bash
 
 # Variables
-SECURITY_GROUP_STAGE="sg-0EXAMPLE1111111111"   # Replace with your Stage Security Group ID
-SECURITY_GROUP_PROD="sg-0EXAMPLE2222222222"    # Replace with your Prod Security Group ID
-SECURITY_GROUP_ID=$SECURITY_GROUP_STAGE  # Default to stage security group
-PORT_START=0                         # Start of the TCP port range (0)
-PORT_END=65535                       # End of the TCP port range (65535)
-PROTOCOL="tcp"                       # Protocol, usually tcp or udp
-IP=""                                # Default empty, will be set by either parameter or fetched
-DESCRIPTION=""                       # Description (name) for identifying the rule
-ENVIRONMENT="stage"                  # Default environment is stage
+SECURITY_GROUP_ID=""
+PORT_START=0
+PORT_END=65535
+PROTOCOL="tcp"
+IP=""
+DESCRIPTION=""
+ENVIRONMENT=""
 
 # Usage function
 usage() {
-  echo "Usage: $0 [-e <prod|stage>] [-i <IP Address>] [-d <Description>] [-h]"
-  echo "  -e <prod|stage>  : (Optional) Specify the environment (prod or stage). Default is stage."
-  echo "  -i <IP Address>  : (Optional) Specify the IP address to use. If not provided, public IP will be fetched."
-  echo "  -d <Description> : Description (name) to identify the security group rule (e.g., Nehal, Kareem)."
-  echo "  -h               : Show this help message."
+  echo "Usage: $0 -g <SecurityGroupId> -d <Description> [-e <env>] [-i <IP Address>] [-h]"
+  echo "  -g <SecurityGroupId> : AWS Security Group ID to update."
+  echo "  -d <Description>     : Description to identify the rule (e.g., Kareem)."
+  echo "  -e <env>             : (Optional) Environment label for display only."
+  echo "  -i <IP Address>      : (Optional) IP to whitelist. Defaults to your public IP."
+  echo "  -h                   : Show this help message."
   exit 1
 }
 
 # Parse command-line arguments
-while getopts ":e:i:d:h" opt; do
+while getopts ":g:e:i:d:h" opt; do
   case $opt in
-    e) ENVIRONMENT="$OPTARG"
-       ;;
-    i) IP="$OPTARG"
-       ;;
-    d) DESCRIPTION="$OPTARG"
-       ;;
-    h) usage
-       ;;
-    \?) echo "Invalid option -$OPTARG" >&2
-        usage
-       ;;
+    g) SECURITY_GROUP_ID="$OPTARG" ;;
+    e) ENVIRONMENT="$OPTARG" ;;
+    i) IP="$OPTARG" ;;
+    d) DESCRIPTION="$OPTARG" ;;
+    h) usage ;;
+    \?) echo "Invalid option -$OPTARG" >&2; usage ;;
   esac
 done
 
-if [[ "$ENVIRONMENT" == "prod" ]]; then
-  SECURITY_GROUP_ID=$SECURITY_GROUP_PROD
-elif [[ "$ENVIRONMENT" != "stage" ]]; then
-  echo "Invalid environment: $ENVIRONMENT. Use 'prod' or 'stage'."
+if [[ -z "$SECURITY_GROUP_ID" ]]; then
+  echo "Error: Security Group ID is required (-g <sgId>)."
   usage
 fi
 

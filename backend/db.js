@@ -135,6 +135,9 @@ function migrateConfig(cfg) {
   migrate();
 }
 
+// Add aws_sg_id column if not present (migration)
+try { db.exec('ALTER TABLE servers ADD COLUMN aws_sg_id TEXT'); } catch {}
+
 // Ensure projects have params arrays (migration for pre-params configs)
 try {
   const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'projects'").get();

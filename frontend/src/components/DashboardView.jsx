@@ -4,10 +4,10 @@ import StackGroup from './StackGroup';
 import ContainerRow from './ContainerRow';
 import BulkActionBar from './BulkActionBar';
 
-export default function DashboardView({ env, stacks, standalone, fetchError, lastRefresh, onRefresh }) {
+export default function DashboardView({ env, stacks, standalone, fetchError, lastRefresh, onRefresh, hasAwsSg }) {
   const [selected, setSelected] = useState(new Set());
 
-  const isAwsEnv = ['stage', 'prod'].includes(env);
+  const isAwsEnv = hasAwsSg;
   const allContainers = stacks?.flatMap(s => s.containers) || [];
   const runningCount = allContainers.filter(c => c.status === 'running').length;
   const stoppedCount = allContainers.filter(c => c.status !== 'running').length;

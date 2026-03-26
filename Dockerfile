@@ -16,7 +16,7 @@ COPY backend/ .
 
 # Stage 3: Final image — only runtime deps, no build tools
 FROM node:20-alpine
-RUN apk add --no-cache git bash nginx
+RUN apk add --no-cache git bash nginx aws-cli jq curl
 
 WORKDIR /app
 COPY --from=backend-build /app .
