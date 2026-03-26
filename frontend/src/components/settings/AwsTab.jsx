@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAppConfig, updateAppConfig } from '../../api';
 
 export default function AwsTab() {
-  const [cfg, setCfg] = useState({ region: '', accessKeyId: '', secretAccessKey: '' });
+  const [cfg, setCfg] = useState({ region: '', description: '', accessKeyId: '', secretAccessKey: '' });
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -19,6 +19,7 @@ export default function AwsTab() {
     <div className="settings-tab">
       <h3>AWS Security Group</h3>
       <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 12 }}>AWS credentials used for Security Group whitelisting. Set the Security Group ID per server in Settings → Servers.</p>
+      <label>Your Name / Description <input placeholder="e.g. Kareem" value={cfg.description || ''} onChange={e => setCfg(c => ({ ...c, description: e.target.value }))} /></label>
       <label>Region <input value={cfg.region} onChange={e => setCfg(c => ({ ...c, region: e.target.value }))} /></label>
       <label>Access Key ID <input value={cfg.accessKeyId || ''} onChange={e => setCfg(c => ({ ...c, accessKeyId: e.target.value }))} /></label>
       <label>Secret Access Key <input type="password" value={cfg.secretAccessKey || ''} onChange={e => setCfg(c => ({ ...c, secretAccessKey: e.target.value }))} /></label>
