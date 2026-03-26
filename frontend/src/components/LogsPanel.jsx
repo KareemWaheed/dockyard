@@ -13,7 +13,8 @@ export default function LogsPanel({ env, container, onClose }) {
   const connect = () => {
     setDisconnected(false);
     setLines([]);
-    const ws = new WebSocket(`ws://localhost:3001/ws/logs?env=${env}&container=${container}`);
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${window.location.host}/ws/logs?env=${env}&container=${container}`);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'line') {
