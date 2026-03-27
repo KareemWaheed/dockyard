@@ -111,7 +111,8 @@ module.exports = function attachLogs(httpServer) {
       runId,
       (chunk) => send({ type: 'chunk', text: chunk }),
       ({ status, exitCode }) => {
-        send({ type: 'done', status, exitCode });
+        const freshRun = db.prepare('SELECT commits_json FROM build_runs WHERE id = ?').get(runId);
+        send({ type: 'done', status, exitCode, commits_json: freshRun?.commits_json || null });
         ws.close();
       }
     );

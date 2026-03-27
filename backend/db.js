@@ -86,6 +86,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_deploy_history_timestamp ON deploy_history(timestamp);
 `);
 
+// Column migrations — tolerate "duplicate column" errors for idempotency
+try { db.exec("ALTER TABLE build_runs ADD COLUMN commits_json TEXT"); } catch {}
+
 // Migrate config.json on first run if servers table is empty
 const serverCount = db.prepare('SELECT COUNT(*) as n FROM servers').get().n;
 if (serverCount === 0 && fs.existsSync(CONFIG_PATH)) {

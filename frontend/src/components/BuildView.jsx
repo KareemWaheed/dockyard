@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   fetchProjects, fetchBranches, startBuild, cloneRepo,
-  fetchBuildRuns, cancelBuildRun,
+  fetchBuildRuns, cancelBuildRun, replayBuildRun,
 } from '../api';
 
 const RECENT_KEY = 'dockyard_build_recent';
@@ -59,6 +59,25 @@ function wsBase() {
   return `${proto}://${location.host}`;
 }
 
+function parseArgsToParams(params, argsJson, branch) {
+  const args = (() => { try { return JSON.parse(argsJson || '[]'); } catch { return []; } })();
+  const result = [];
+  if (branch) result.push({ label: 'Branch', value: branch });
+  for (const p of (params || [])) {
+    if (p.type === 'checkbox') {
+      result.push({ label: p.label || p.name, value: args.includes(p.flag) ? 'yes' : 'no' });
+    } else if (p.type === 'multiselect') {
+      const vals = [];
+      args.forEach((a, i) => { if (a === p.flag && i + 1 < args.length) vals.push(args[i + 1]); });
+      if (vals.length > 0) result.push({ label: p.label || p.name, value: vals.join(', ') });
+    } else {
+      const idx = args.indexOf(p.flag);
+      if (idx !== -1 && idx + 1 < args.length) result.push({ label: p.label || p.name, value: args[idx + 1] });
+    }
+  }
+  return result;
+}
+
 export default function BuildView() {
   const [projects, setProjects] = useState({});
   const [projectKeys, setProjectKeys] = useState([]);
@@ -108,7 +127,9 @@ export default function BuildView() {
       if (msg.type === 'chunk') setLiveLog(prev => prev + msg.text);
       if (msg.type === 'done') {
         setLiveStatus(msg.status);
-        setRuns(prev => prev.map(r => r.id === run.id ? { ...r, status: msg.status } : r));
+        setRuns(prev => prev.map(r => r.id === run.id
+          ? { ...r, status: msg.status, commits_json: msg.commits_json ?? r.commits_json }
+          : r));
       }
     };
     ws.onerror = () => setLiveStatus(run.status || 'failed');
@@ -184,6 +205,24 @@ export default function BuildView() {
     } catch (err) { console.error(err); }
   };
 
+  const handleReplay = async () => {
+    if (!selectedRun || selectedRun.type !== 'build') return;
+    try {
+      const result = await replayBuildRun(activeProject, selectedRun.build_number);
+      const run = {
+        id: result.runId,
+        build_number: result.buildNumber,
+        type: 'build',
+        status: 'running',
+        branch: selectedRun.branch,
+        args_json: selectedRun.args_json,
+        started_at: new Date().toISOString(),
+      };
+      setRuns(prev => [run, ...prev]);
+      openRun(run);
+    } catch (err) { console.error(err); }
+  };
+
   const handleCancel = async () => {
     const run = runs.find(r => r.id === selectedRunId);
     if (!run) return;
@@ -198,6 +237,11 @@ export default function BuildView() {
 
   const selectedRun = runs.find(r => r.id === selectedRunId);
   const isSelectedRunning = selectedRun?.status === 'running';
+
+  const parsedParams = selectedRun?.type === 'build'
+    ? parseArgsToParams(params, selectedRun?.args_json, selectedRun?.branch)
+    : [];
+  const parsedCommits = (() => { try { return JSON.parse(selectedRun?.commits_json || '[]'); } catch { return []; } })();
 
   if (loading) return <div className="build-view" style={{ padding: 24, color: 'var(--text-dim)' }}>Loading projects…</div>;
   if (projectKeys.length === 0) return <div className="build-view" style={{ padding: 24, color: 'var(--text-dim)' }}>No build projects configured. Add projects in Settings → Build Projects.</div>;
@@ -310,8 +354,44 @@ export default function BuildView() {
             {liveStatus && !isSelectedRunning && (
               <span style={{ color: statusColor(liveStatus), fontSize: 12 }}>{statusLabel(liveStatus)}</span>
             )}
+            {selectedRun?.type === 'build' && !isSelectedRunning && (
+              <button
+                onClick={handleReplay}
+                disabled={isRunning}
+                style={{ background: 'rgba(122,162,247,0.12)', color: 'var(--blue)', border: '1px solid rgba(122,162,247,0.25)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.5 : 1 }}
+              >
+                ↺ Replay
+              </button>
+            )}
           </div>
         </div>
+        {selectedRun?.type === 'build' && (parsedParams.length > 0 || parsedCommits.length > 0) && (
+          <div className="build-run-meta">
+            {parsedParams.length > 0 && (
+              <div className="build-meta-section">
+                <div className="build-meta-label">Params</div>
+                {parsedParams.map(({ label, value }) => (
+                  <div key={label} className="build-meta-row">
+                    <span className="build-meta-key">{label}</span>
+                    <span className="build-meta-val">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parsedCommits.length > 0 && (
+              <div className="build-meta-section">
+                <div className="build-meta-label">Commits</div>
+                {parsedCommits.map(c => (
+                  <div key={c.hash} className="build-meta-commit">
+                    <span className="build-meta-hash">{c.shortHash}</span>
+                    <span className="build-meta-subject">{c.subject}</span>
+                    <span className="build-meta-date">{c.date}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="build-output-terminal" ref={outputRef}>
           {liveLog || <span style={{ color: 'var(--text-dim)' }}>Select a run to view output…</span>}
         </div>

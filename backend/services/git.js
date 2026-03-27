@@ -38,8 +38,31 @@ function listBranches(projectKey) {
 function checkoutAndPull(projectKey, branch) {
   if (!/^[\w.\-\/]+$/.test(branch)) throw new Error(`Invalid branch name: ${branch}`);
   const dir = repoDir(projectKey);
-  // Use -B to create/reset local branch tracking origin/<branch>, avoids detached HEAD
+  // Use -B to create/reset local branch tracking origin/<branch>, avoids detached HEAD.
+  // Then fetch and pull to ensure the local branch is at the latest remote state.
   execSync(`git checkout -B ${branch} origin/${branch}`, { cwd: dir, stdio: 'pipe' });
+  execSync(`git fetch origin ${branch} --prune`, { cwd: dir, stdio: 'pipe' });
+  execSync(`git pull --ff-only origin ${branch}`, { cwd: dir, stdio: 'pipe' });
+}
+
+function getRecentCommits(projectKey, n = 3) {
+  const dir = repoDir(projectKey);
+  try {
+    // Use ASCII unit-separator (x1F) between fields, newline between entries
+    const out = execSync(
+      `git log -${n} --pretty=format:"%H%x1F%h%x1F%s%x1F%an%x1F%ar%n"`,
+      { cwd: dir }
+    ).toString().trim();
+    if (!out) return [];
+    return out.split('\n')
+      .map(line => {
+        const [hash, shortHash, subject, author, date] = line.split('\x1f');
+        return { hash, shortHash, subject, author, date };
+      })
+      .filter(c => c.hash);
+  } catch {
+    return [];
+  }
 }
 
 function spawnClone(projectKey, repoUrl, token, onData, onClose) {
@@ -68,4 +91,4 @@ function spawnBuild(projectKey, scriptName, args, onData, onClose, env = {}) {
   return proc;
 }
 
-module.exports = { ensureCloned, listBranches, checkoutAndPull, spawnBuild, spawnClone, repoDir };
+module.exports = { ensureCloned, listBranches, checkoutAndPull, getRecentCommits, spawnBuild, spawnClone, repoDir };

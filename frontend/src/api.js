@@ -74,6 +74,13 @@ export async function cancelBuildRun(project, buildNumber) {
   return r.json();
 }
 
+// Replay a finished build with the same branch + args
+export async function replayBuildRun(project, buildNumber) {
+  const r = await fetch(`${BASE}/builds/${project}/runs/${buildNumber}/replay`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 // Streams whitelist output
 export async function whitelistIp(env, onChunk, onDone) {
   const r = await fetch(`${BASE}/awssg/whitelist`, {

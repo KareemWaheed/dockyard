@@ -1,7 +1,7 @@
 // backend/services/build-manager.js
 const { EventEmitter } = require('events');
 const db = require('../db');
-const { spawnBuild, spawnClone, checkoutAndPull } = require('./git');
+const { spawnBuild, spawnClone, checkoutAndPull, getRecentCommits } = require('./git');
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
@@ -65,6 +65,10 @@ function startBuildRun(project, branch, args, awsEnv) {
     emitter.emit(`run:${runId}:done`, { exitCode: 1, status: 'failed' });
     return { runId, buildNumber };
   }
+
+  // Capture the last 3 commits on this branch after checkout
+  const commits = getRecentCommits(project);
+  db.prepare('UPDATE build_runs SET commits_json = ? WHERE id = ?').run(JSON.stringify(commits), runId);
 
   appendLog(runId, `Running ${proj.buildScript}...\n`);
   activeProcesses.set(runId, null); // placeholder so finishRun sees it as active

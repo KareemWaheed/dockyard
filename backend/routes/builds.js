@@ -98,7 +98,7 @@ router.post('/:project', async (req, res) => {
 router.get('/:project/runs', (req, res) => {
   const { project } = req.params;
   const runs = db.prepare(
-    'SELECT id, project, build_number, type, status, exit_code, branch, args_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT 50'
+    'SELECT id, project, build_number, type, status, exit_code, branch, args_json, commits_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT 50'
   ).all(project);
   res.json(runs);
 });
@@ -111,6 +111,21 @@ router.get('/:project/runs/:num', (req, res) => {
   ).get(project, parseInt(num, 10));
   if (!run) return res.status(404).json({ error: 'Run not found' });
   res.json(run);
+});
+
+// POST /api/builds/:project/runs/:num/replay — re-run with identical params
+router.post('/:project/runs/:num/replay', (req, res) => {
+  const { project, num } = req.params;
+  const run = db.prepare(
+    'SELECT * FROM build_runs WHERE project = ? AND build_number = ?'
+  ).get(project, parseInt(num, 10));
+  if (!run) return res.status(404).json({ error: 'Run not found' });
+  if (run.type !== 'build') return res.status(400).json({ error: 'Only build runs can be replayed' });
+
+  writeAwsConfig();
+  const args = (() => { try { return JSON.parse(run.args_json || '[]'); } catch { return []; } })();
+  const { runId, buildNumber } = startBuildRun(project, run.branch, args, getAwsEnv());
+  res.json({ runId, buildNumber });
 });
 
 // DELETE /api/builds/:project/runs/:num — cancel
