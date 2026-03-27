@@ -4,11 +4,27 @@ const { connect } = require('../services/ssh');
 const { subscribeRun } = require('../services/build-manager');
 
 module.exports = function attachLogs(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/logs' });
+  // Single WSS instance — ws@8.x aborts the socket if a path-filtered WSS
+  // doesn't match, preventing a second WSS from ever receiving the upgrade.
+  // Route manually instead.
+  const wss = new WebSocketServer({ server: httpServer });
 
   wss.on('connection', async (ws, req) => {
-    // Parse query params: ?env=prod&container=frontend
     const url = new URL(req.url, 'http://localhost');
+    const pathname = url.pathname;
+
+    if (pathname === '/ws/builds') {
+      handleBuildWs(ws, url);
+      return;
+    }
+
+    if (pathname !== '/ws/logs') {
+      ws.close();
+      return;
+    }
+
+    // ── Container log streaming (/ws/logs) ──────────────────────────────
+    // Parse query params: ?env=prod&container=frontend
     const env = url.searchParams.get('env');
     const container = url.searchParams.get('container');
 
@@ -62,11 +78,8 @@ module.exports = function attachLogs(httpServer) {
     });
   });
 
-  // ── Build run logs ───────────────────────────────────────────────────────
-  const buildWss = new WebSocketServer({ server: httpServer, path: '/ws/builds' });
-
-  buildWss.on('connection', (ws, req) => {
-    const url = new URL(req.url, 'http://localhost');
+  // ── Build run log streaming (/ws/builds) ────────────────────────────────
+  function handleBuildWs(ws, url) {
     const runId = parseInt(url.searchParams.get('runId'), 10);
 
     if (!runId) {
@@ -104,5 +117,5 @@ module.exports = function attachLogs(httpServer) {
     );
 
     ws.on('close', unsub);
-  });
+  }
 };

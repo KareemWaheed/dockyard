@@ -187,7 +187,13 @@ export default function BuildView() {
   const handleCancel = async () => {
     const run = runs.find(r => r.id === selectedRunId);
     if (!run) return;
-    try { await cancelBuildRun(activeProject, run.build_number); } catch (err) { console.error(err); }
+    try {
+      await cancelBuildRun(activeProject, run.build_number);
+      // Optimistically reflect the cancellation — the WS done message will
+      // confirm the final status, but the button should disappear immediately.
+      setRuns(prev => prev.map(r => r.id === run.id ? { ...r, status: 'cancelled' } : r));
+      setLiveStatus('cancelled');
+    } catch (err) { console.error(err); }
   };
 
   const selectedRun = runs.find(r => r.id === selectedRunId);
