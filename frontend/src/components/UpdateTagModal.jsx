@@ -14,7 +14,7 @@ export default function UpdateTagModal({ env, container, stackPath, onClose, onD
     setBusy(true); setError('');
     try {
       await containerAction(env, container.name, 'update-tag', {
-        stackPath, serviceName: container.name, newTag: tag.trim(), note,
+        stackPath, serviceName: container.serviceName || container.name, newTag: tag.trim(), note,
       });
       onDone(); onClose();
     } catch (e) { setError(e.message); }
