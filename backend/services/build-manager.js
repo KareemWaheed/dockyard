@@ -67,6 +67,7 @@ function startBuildRun(project, branch, args, awsEnv) {
   }
 
   appendLog(runId, `Running ${proj.buildScript}...\n`);
+  activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
   const proc = spawnBuild(
     project, proj.buildScript, args,
     (chunk) => appendLog(runId, chunk),
@@ -85,6 +86,7 @@ function startCloneRun(project, repoUrl, token) {
   const runId = info.lastInsertRowid;
 
   appendLog(runId, `Cloning ${repoUrl}...\n`);
+  activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
   const proc = spawnClone(
     project, repoUrl, token,
     (chunk) => appendLog(runId, chunk),
@@ -95,15 +97,16 @@ function startCloneRun(project, repoUrl, token) {
 }
 
 function cancelRun(runId) {
+  if (!activeProcesses.has(runId)) return false;
   const proc = activeProcesses.get(runId);
-  if (!proc) return false;
-  // Mark as cancelled BEFORE killing so the natural 'close' event maps to 'cancelled'.
   cancelledRuns.add(runId);
   appendLog(runId, '\n[Cancelled by user]\n');
-  try {
-    process.kill(-proc.pid, 'SIGTERM');
-  } catch {
-    proc.kill('SIGTERM');
+  if (proc) {
+    try {
+      process.kill(-proc.pid, 'SIGTERM');
+    } catch {
+      proc.kill('SIGTERM');
+    }
   }
   return true;
 }
@@ -111,14 +114,18 @@ function cancelRun(runId) {
 function subscribeRun(runId, onChunk, onDone) {
   const chunkKey = `run:${runId}:chunk`;
   const doneKey = `run:${runId}:done`;
-  emitter.on(chunkKey, onChunk);
-  emitter.once(doneKey, (result) => {
+
+  const doneWrapper = (result) => {
     emitter.off(chunkKey, onChunk);
     onDone(result);
-  });
+  };
+
+  emitter.on(chunkKey, onChunk);
+  emitter.once(doneKey, doneWrapper);
+
   return () => {
     emitter.off(chunkKey, onChunk);
-    emitter.off(doneKey, onDone);
+    emitter.off(doneKey, doneWrapper);
   };
 }
 
