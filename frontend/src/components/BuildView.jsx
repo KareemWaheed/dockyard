@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { fetchProjects, fetchBranches, startBuild, cloneRepo } from '../api';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  fetchProjects, fetchBranches, startBuild, cloneRepo,
+  fetchBuildRuns, cancelBuildRun,
+} from '../api';
 
 const RECENT_KEY = 'dockyard_build_recent';
-
 function loadRecent() {
   try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || {}; } catch { return {}; }
 }
-
 function saveRecent(projectKey, formValues) {
   const recent = loadRecent();
   recent[projectKey] = formValues;
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
 }
-
 function initFormState(params) {
   const state = {};
   for (const p of params) {
@@ -22,32 +22,41 @@ function initFormState(params) {
   }
   return state;
 }
-
 function buildArgs(params, formValues) {
   const args = [];
   for (const p of params) {
     const val = formValues[p.name];
-    if (p.type === 'checkbox') {
-      if (val) args.push(p.flag);
-    } else if (p.type === 'multiselect') {
-      if (Array.isArray(val)) val.forEach(item => args.push(p.flag, item));
-    } else {
-      if (val) args.push(p.flag, val);
-    }
+    if (p.type === 'checkbox') { if (val) args.push(p.flag); }
+    else if (p.type === 'multiselect') { if (Array.isArray(val)) val.forEach(item => args.push(p.flag, item)); }
+    else { if (val) args.push(p.flag, val); }
   }
   return args;
 }
-
 function isFormValid(params, formValues, branch) {
   if (!branch) return false;
   for (const p of params) {
     if (!p.required) continue;
     const val = formValues[p.name];
     if (p.type === 'multiselect') { if (!val || val.length === 0) return false; }
-    else if (p.type === 'checkbox') { /* checkboxes are always valid */ }
-    else { if (!val) return false; }
+    else if (p.type !== 'checkbox') { if (!val) return false; }
   }
   return true;
+}
+function statusColor(status) {
+  if (status === 'success') return 'var(--green)';
+  if (status === 'failed') return 'var(--red)';
+  if (status === 'cancelled') return 'var(--text-dim)';
+  return 'var(--yellow, #f59e0b)';
+}
+function statusLabel(status) {
+  if (status === 'running') return '● running';
+  if (status === 'success') return '✓ success';
+  if (status === 'failed') return '✗ failed';
+  return '○ cancelled';
+}
+function wsBase() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.host}`;
 }
 
 export default function BuildView() {
@@ -59,13 +68,14 @@ export default function BuildView() {
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [needsClone, setNeedsClone] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [output, setOutput] = useState('');
-  const [building, setBuilding] = useState(false);
-  const [exitCode, setExitCode] = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [liveLog, setLiveLog] = useState('');
+  const [liveStatus, setLiveStatus] = useState(null);
   const [recent, setRecent] = useState(loadRecent);
   const [loading, setLoading] = useState(true);
   const outputRef = useRef(null);
+  const wsRef = useRef(null);
 
   useEffect(() => {
     fetchProjects().then(data => {
@@ -85,62 +95,103 @@ export default function BuildView() {
     }).catch(() => setLoading(false));
   }, []);
 
+  const openRun = useCallback((run) => {
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    setSelectedRunId(run.id);
+    setLiveLog('');
+    setLiveStatus(run.status !== 'running' ? run.status : null);
+
+    const ws = new WebSocket(`${wsBase()}/ws/builds?runId=${run.id}`);
+    wsRef.current = ws;
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'chunk') setLiveLog(prev => prev + msg.text);
+      if (msg.type === 'done') {
+        setLiveStatus(msg.status);
+        setRuns(prev => prev.map(r => r.id === run.id ? { ...r, status: msg.status } : r));
+      }
+    };
+    ws.onerror = () => setLiveStatus(run.status || 'failed');
+  }, []);
+
+  useEffect(() => {
+    if (!activeProject) return;
+    // Reset run selection on project switch to avoid stale closure
+    setSelectedRunId(null);
+    setRuns([]);
+    setLiveLog('');
+    setLiveStatus(null);
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+
+    setLoadingBranches(true); setNeedsClone(false);
+    fetchBranches(activeProject)
+      .then(r => {
+        setNeedsClone(!!r.needsClone);
+        setBranches(r.branches || []);
+        if (!branchStates[activeProject]) setBranchStates(p => ({ ...p, [activeProject]: r.branches?.[0] || '' }));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingBranches(false));
+
+    fetchBuildRuns(activeProject)
+      .then(r => {
+        setRuns(r);
+        if (r.length > 0) openRun(r[0]);
+      })
+      .catch(() => {});
+  }, [activeProject]);
+
+  useEffect(() => {
+    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
+  }, [liveLog]);
+
+  useEffect(() => () => { wsRef.current?.close(); }, []);
+
   const proj = activeProject ? projects[activeProject] : null;
   const params = proj?.params || [];
   const form = formStates[activeProject] || {};
   const branch = branchStates[activeProject] || '';
 
-  const setField = (key, value) => {
-    setFormStates(prev => ({
-      ...prev,
-      [activeProject]: { ...prev[activeProject], [key]: value },
-    }));
+  const setField = (key, value) => setFormStates(prev => ({
+    ...prev, [activeProject]: { ...prev[activeProject], [key]: value },
+  }));
+  const setBranch = (value) => setBranchStates(prev => ({ ...prev, [activeProject]: value }));
+
+  const isRunning = runs.some(r => r.status === 'running');
+  const canBuild = !needsClone && isFormValid(params, form, branch);
+
+  const handleClone = async () => {
+    try {
+      const result = await cloneRepo(activeProject);
+      if (result.alreadyCloned) { setNeedsClone(false); return; }
+      const run = { id: result.runId, build_number: result.buildNumber, type: 'clone', status: 'running', started_at: new Date().toISOString() };
+      setRuns(prev => [run, ...prev]);
+      openRun(run);
+      setNeedsClone(false);
+    } catch (err) { console.error(err); }
   };
 
-  const setBranch = (value) => {
-    setBranchStates(prev => ({ ...prev, [activeProject]: value }));
-  };
-
-  const loadBranchList = () => {
-    if (!activeProject) return;
-    setLoadingBranches(true); setNeedsClone(false);
-    fetchBranches(activeProject)
-      .then(r => {
-        setNeedsClone(!!r.needsClone);
-        setBranches(r.branches);
-        if (!branch) setBranch(r.branches[0] || '');
-      })
-      .catch(() => {})
-      .finally(() => setLoadingBranches(false));
-  };
-
-  useEffect(() => { if (activeProject) loadBranchList(); }, [activeProject]);
-
-  useEffect(() => {
-    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
-  }, [output]);
-
-  const args = buildArgs(params, form);
-  const canBuild = !building && !cloning && !needsClone && isFormValid(params, form, branch);
-  const commandPreview = branch && proj?.buildScript ? `bash scripts/${proj.buildScript} ${args.join(' ')}` : null;
-
-  const clone = async () => {
-    setOutput(''); setExitCode(null); setCloning(true);
-    await cloneRepo(activeProject, c => setOutput(o => o + c), code => {
-      setCloning(false); setExitCode(code);
-      if (code === 0) loadBranchList();
-    });
-  };
-
-  const build = async () => {
+  const handleBuild = async () => {
     if (!canBuild) return;
-    setOutput(''); setExitCode(null); setBuilding(true);
+    const args = buildArgs(params, form);
     saveRecent(activeProject, { branch, ...form });
     setRecent(loadRecent());
-    await startBuild(activeProject, branch, args, c => setOutput(o => o + c), code => {
-      setExitCode(code); setBuilding(false);
-    });
+    try {
+      const result = await startBuild(activeProject, branch, args);
+      const run = { id: result.runId, build_number: result.buildNumber, type: 'build', status: 'running', branch, started_at: new Date().toISOString() };
+      setRuns(prev => [run, ...prev]);
+      openRun(run);
+    } catch (err) { console.error(err); }
   };
+
+  const handleCancel = async () => {
+    const run = runs.find(r => r.id === selectedRunId);
+    if (!run) return;
+    try { await cancelBuildRun(activeProject, run.build_number); } catch (err) { console.error(err); }
+  };
+
+  const selectedRun = runs.find(r => r.id === selectedRunId);
+  const isSelectedRunning = selectedRun?.status === 'running';
 
   if (loading) return <div className="build-view" style={{ padding: 24, color: 'var(--text-dim)' }}>Loading projects…</div>;
   if (projectKeys.length === 0) return <div className="build-view" style={{ padding: 24, color: 'var(--text-dim)' }}>No build projects configured. Add projects in Settings → Build Projects.</div>;
@@ -172,61 +223,91 @@ export default function BuildView() {
         </div>
       </div>
 
-      {/* Col 2: Form */}
+      {/* Col 2: Form + Run history */}
       <div className="build-form">
         <div>
           <div className="build-form-title">{proj.name}</div>
           <div className="build-form-subtitle">Build & push a new image</div>
         </div>
 
-        {/* Branch (always present) */}
         <div className="form-field">
           <label className="form-label">Branch</label>
           {loadingBranches
             ? <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Fetching branches…</span>
             : needsClone
-              ? <button className="btn-primary" onClick={clone} disabled={cloning}>
-                  {cloning ? 'Cloning…' : '>> Clone Repository'}
-                </button>
+              ? <button className="btn-primary" onClick={handleClone}>{'>> Clone Repository'}</button>
               : <SearchableSelect value={branch} options={branches} onChange={setBranch} />
           }
         </div>
 
-        {/* Dynamic params */}
         {params.map(p => (
           <ParamField key={p.name} param={p} value={form[p.name]} onChange={v => setField(p.name, v)} />
         ))}
 
-        {/* Command preview */}
-        {commandPreview && (
-          <div className="command-preview">
-            <div className="command-preview-label">Command</div>
-            <div className="command-preview-text">{commandPreview}</div>
+        <button className="btn-build" onClick={handleBuild} disabled={!canBuild || isRunning}>
+          {isRunning ? 'Building…' : '>> Build & Push'}
+        </button>
+
+        {runs.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <div className="build-recent-label" style={{ marginBottom: 6 }}>Runs</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {runs.map(run => (
+                <button
+                  key={run.id}
+                  onClick={() => openRun(run)}
+                  style={{
+                    background: selectedRunId === run.id ? 'var(--surface-hover)' : 'transparent',
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '5px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <span style={{ color: 'var(--text)', fontSize: 12 }}>
+                    #{run.build_number} {run.type === 'clone' ? 'clone' : run.branch || ''}
+                  </span>
+                  <span style={{ color: statusColor(run.status), fontSize: 11 }}>
+                    {statusLabel(run.status)}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Build button */}
-        <button className="btn-build" onClick={build} disabled={!canBuild}>
-          {building ? 'Building…' : cloning ? 'Cloning…' : '>> Build & Push'}
-        </button>
       </div>
 
-      {/* Col 3: Output */}
+      {/* Col 3: Log output */}
       <div className="build-output">
         <div className="build-output-header">
-          <span>Output</span>
-          {building && <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span className="status-dot running" />
-            <span style={{ color: 'var(--green)', letterSpacing: 0 }}>running</span>
-          </span>}
+          <span>{selectedRun ? `#${selectedRun.build_number} — ${selectedRun.type}` : 'Output'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isSelectedRunning && (
+              <>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span className="status-dot running" />
+                  <span style={{ color: 'var(--green)', letterSpacing: 0 }}>running</span>
+                </span>
+                <button
+                  onClick={handleCancel}
+                  style={{ background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+            {liveStatus && !isSelectedRunning && (
+              <span style={{ color: statusColor(liveStatus), fontSize: 12 }}>{statusLabel(liveStatus)}</span>
+            )}
+          </div>
         </div>
         <div className="build-output-terminal" ref={outputRef}>
-          {output || <span style={{ color: 'var(--text-dim)' }}>Output will appear here…</span>}
-          {exitCode !== null && (
-            <div style={{ color: exitCode === 0 ? 'var(--green)' : 'var(--red)', fontWeight: 'bold', marginTop: 8 }}>
-              {exitCode === 0 ? '✓ Build succeeded' : `✗ Build failed (exit ${exitCode})`}
-            </div>
-          )}
+          {liveLog || <span style={{ color: 'var(--text-dim)' }}>Select a run to view output…</span>}
         </div>
       </div>
     </div>
@@ -236,63 +317,46 @@ export default function BuildView() {
 function ParamField({ param, value, onChange }) {
   const { type, label, name, options, required, placeholder, flag } = param;
   const labelText = `${label || name}${required ? ' *' : ''}`;
-
-  if (type === 'string') {
-    return (
-      <div className="form-field">
-        <label className="form-label">{labelText}</label>
-        <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder || ''} style={{ width: '100%' }} />
+  if (type === 'string') return (
+    <div className="form-field">
+      <label className="form-label">{labelText}</label>
+      <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder || ''} style={{ width: '100%' }} />
+    </div>
+  );
+  if (type === 'select') return (
+    <div className="form-field">
+      <label className="form-label">{labelText}</label>
+      <div className="pill-group">
+        {(options || []).map(opt => (
+          <button key={opt} className={`pill ${value === opt ? 'active' : ''}`} onClick={() => onChange(opt)}>{opt.toUpperCase()}</button>
+        ))}
       </div>
-    );
-  }
-
-  if (type === 'select') {
-    return (
-      <div className="form-field">
-        <label className="form-label">{labelText}</label>
-        <div className="pill-group">
-          {(options || []).map(opt => (
-            <button key={opt} className={`pill ${value === opt ? 'active' : ''}`} onClick={() => onChange(opt)}>
-              {opt.toUpperCase()}
+    </div>
+  );
+  if (type === 'checkbox') return <Toggle label={`${label || name} (${flag})`} value={!!value} onChange={onChange} />;
+  if (type === 'multiselect') return (
+    <div className="form-field">
+      <label className="form-label">{labelText}</label>
+      <div className="pill-group" style={{ flexWrap: 'wrap' }}>
+        {(options || []).map(opt => {
+          const selected = Array.isArray(value) && value.includes(opt);
+          return (
+            <button key={opt} className={`pill ${selected ? 'active' : ''}`}
+              onClick={() => onChange(selected ? value.filter(x => x !== opt) : [...(value || []), opt])}>
+              {opt}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
-    );
-  }
-
-  if (type === 'checkbox') {
-    return <Toggle label={`${label || name} (${flag})`} value={!!value} onChange={onChange} />;
-  }
-
-  if (type === 'multiselect') {
-    return (
-      <div className="form-field">
-        <label className="form-label">{labelText}</label>
-        <div className="pill-group" style={{ flexWrap: 'wrap' }}>
-          {(options || []).map(opt => {
-            const selected = Array.isArray(value) && value.includes(opt);
-            return (
-              <button key={opt} className={`pill ${selected ? 'active' : ''}`}
-                onClick={() => onChange(selected ? value.filter(x => x !== opt) : [...(value || []), opt])}>
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
+    </div>
+  );
   return null;
 }
 
 function Toggle({ label, value, onChange }) {
   return (
     <div className="toggle-row" onClick={() => onChange(!value)}>
-      <div className={`toggle-track ${value ? 'on' : ''}`}>
-        <div className="toggle-thumb" />
-      </div>
+      <div className={`toggle-track ${value ? 'on' : ''}`}><div className="toggle-thumb" /></div>
       <span>{label}</span>
     </div>
   );
@@ -303,15 +367,12 @@ function SearchableSelect({ value, options, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
-
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
-
   const select = opt => { onChange(opt); setSearch(''); setOpen(false); };
-
   return (
     <div className="searchable-select" ref={ref}>
       <input
