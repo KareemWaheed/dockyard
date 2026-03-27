@@ -42,32 +42,36 @@ export async function addService(env, stackIdx, body) {
   return r.json();
 }
 
-// Streams git clone output
-export async function cloneRepo(project, onChunk, onDone) {
+// Starts a clone — returns { runId, buildNumber } or { alreadyCloned: true }
+export async function cloneRepo(project) {
   const r = await fetch(`${BASE}/builds/${project}/clone`, { method: 'POST' });
-  if (!r.ok) {
-    const err = await r.text();
-    onChunk(`ERROR: ${err}\n`);
-    onDone(1);
-    return;
-  }
-  await streamWithSentinel(r, onChunk, onDone);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
-// Streams build output — calls onChunk(text) repeatedly, onDone(exitCode)
-export async function startBuild(project, branch, args, onChunk, onDone) {
+// Starts a build — returns { runId, buildNumber }
+export async function startBuild(project, branch, args) {
   const r = await fetch(`${BASE}/builds/${project}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch, args }),
   });
-  if (!r.ok) {
-    const err = await r.text();
-    onChunk(`ERROR: ${err}\n`);
-    onDone(1);
-    return;
-  }
-  await streamWithSentinel(r, onChunk, onDone);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// List runs for a project (no log content)
+export async function fetchBuildRuns(project) {
+  const r = await fetch(`${BASE}/builds/${project}/runs`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// Cancel a running build
+export async function cancelBuildRun(project, buildNumber) {
+  const r = await fetch(`${BASE}/builds/${project}/runs/${buildNumber}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
 // Streams whitelist output
