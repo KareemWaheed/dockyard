@@ -23,21 +23,9 @@ function getServerConfig(server) {
   };
 }
 
-function readResolvedManagedPassword(composeConfigJson, serviceName) {
-  const service = composeConfigJson?.services?.[serviceName];
-  const environment = service?.environment || {};
-  const envMap = Array.isArray(environment)
-    ? environment.reduce((acc, entry) => {
-        if (typeof entry !== 'string') return acc;
-        const idx = entry.indexOf('=');
-        if (idx === -1) return acc;
-        acc[entry.slice(0, idx)] = entry.slice(idx + 1);
-        return acc;
-      }, {})
-    : environment;
-
+function readManagedPasswordFromAppEnv() {
   for (const key of MANAGED_PASSWORD_ENV_KEYS) {
-    if (envMap[key]) return envMap[key];
+    if (process.env[key]) return process.env[key];
   }
   return null;
 }
@@ -185,12 +173,10 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
 
   try {
     const conn = await connect(env, serverCfg);
-    const configOutput = await exec(conn, `${dc} -f "${stackPath}" config --format json`);
-    const resolvedConfig = JSON.parse(configOutput);
-    const expectedPassword = readResolvedManagedPassword(resolvedConfig, serviceName);
+    const expectedPassword = readManagedPasswordFromAppEnv();
 
     if (!expectedPassword) {
-      return res.status(400).json({ error: `Managed password is not configured in service environment. Expected one of: ${MANAGED_PASSWORD_ENV_KEYS.join(', ')}` });
+      return res.status(400).json({ error: `Managed password is not configured in Dockyard environment. Expected one of: ${MANAGED_PASSWORD_ENV_KEYS.join(', ')}` });
     }
     if (!password || password !== expectedPassword) {
       return res.status(403).json({ error: 'Invalid managed password' });
