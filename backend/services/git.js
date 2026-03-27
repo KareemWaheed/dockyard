@@ -25,7 +25,11 @@ async function ensureCloned(projectKey, repoUrl, token) {
 function listBranches(projectKey) {
   const dir = repoDir(projectKey);
   execSync('git fetch --all --prune', { cwd: dir, stdio: 'pipe' });
-  const output = execSync('git branch -r --format="%(refname:short)"', { cwd: dir }).toString();
+  // Sort by most recent commit date (committerdate) so newest branches come first
+  const output = execSync(
+    'git branch -r --sort=-committerdate --format="%(refname:short)"',
+    { cwd: dir }
+  ).toString();
   return output.trim().split('\n')
     .map(b => b.trim().replace(/^origin\//, ''))
     .filter(b => b && b !== 'HEAD');
