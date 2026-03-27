@@ -698,6 +698,78 @@ input:focus, select:focus, textarea:focus {
   color: var(--text-muted);
 }
 
+.build-run-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.15);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.build-meta-section { flex: 1; min-width: 0; }
+
+.build-meta-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.build-meta-row {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  margin-bottom: 3px;
+  align-items: baseline;
+}
+
+.build-meta-key {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.build-meta-val {
+  color: var(--text-muted);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-meta-commit {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  margin-bottom: 3px;
+  align-items: baseline;
+  overflow: hidden;
+}
+
+.build-meta-hash {
+  color: var(--blue);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.build-meta-subject {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.build-meta-date {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  font-size: 9px;
+}
+
 /* ── Command palette ── */
 .palette-backdrop {
   position: fixed;
