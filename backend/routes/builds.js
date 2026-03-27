@@ -17,8 +17,21 @@ function getAwsEnv() {
   const env = {};
   if (cfg.accessKeyId) env.AWS_ACCESS_KEY_ID = cfg.accessKeyId;
   if (cfg.secretAccessKey) env.AWS_SECRET_ACCESS_KEY = cfg.secretAccessKey;
-  if (cfg.region) env.AWS_DEFAULT_REGION = cfg.region;
+  if (cfg.region) { env.AWS_DEFAULT_REGION = cfg.region; env.AWS_REGION = cfg.region; }
   return env;
+}
+
+function writeAwsConfig() {
+  const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'awsSg'").get();
+  const cfg = row ? JSON.parse(row.value_json) : {};
+  if (!cfg.accessKeyId || !cfg.secretAccessKey) return;
+  const home = process.env.HOME || '/root';
+  const awsDir = `${home}/.aws`;
+  fs.mkdirSync(awsDir, { recursive: true });
+  fs.writeFileSync(`${awsDir}/credentials`,
+    `[default]\naws_access_key_id=${cfg.accessKeyId}\naws_secret_access_key=${cfg.secretAccessKey}\n`);
+  fs.writeFileSync(`${awsDir}/config`,
+    `[default]\nregion=${cfg.region || 'us-east-1'}\n`);
 }
 
 // GET /api/builds/projects — return all projects with param schemas
@@ -88,6 +101,7 @@ router.post('/:project', async (req, res) => {
     await ensureCloned(project, proj.repo, getGitlabToken());
     res.write(`Checking out ${branch}...\n`);
     checkoutAndPull(project, branch);
+    writeAwsConfig();
     res.write(`Running ${proj.buildScript}...\n`);
     spawnBuild(project, proj.buildScript, args,
       (data) => res.write(data),
