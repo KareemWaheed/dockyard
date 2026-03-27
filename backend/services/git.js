@@ -9,8 +9,8 @@ function repoDir(projectKey) {
 }
 
 function buildAuthUrl(repoUrl, token) {
-  // Insert oauth2:token@ after https://
-  return repoUrl.replace('https://', `https://oauth2:${token}@`);
+  // Insert oauth2:token@ after http:// or https://
+  return repoUrl.replace(/^(https?:\/\/)/, `$1oauth2:${token}@`);
 }
 
 async function ensureCloned(projectKey, repoUrl, token) {
