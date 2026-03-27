@@ -49,10 +49,10 @@ function spawnClone(projectKey, repoUrl, token, onData, onClose) {
   return proc;
 }
 
-function spawnBuild(projectKey, scriptName, args, onData, onClose) {
+function spawnBuild(projectKey, scriptName, args, onData, onClose, env = {}) {
   const dir = repoDir(projectKey);
   const scriptPath = path.join(dir, scriptName);
-  const proc = spawn('bash', [scriptPath, ...args], { cwd: dir });
+  const proc = spawn('bash', [scriptPath, ...args], { cwd: dir, env: { ...process.env, ...env } });
   proc.stdout.on('data', (d) => onData(d.toString()));
   proc.stderr.on('data', (d) => onData(d.toString()));
   proc.on('close', onClose);

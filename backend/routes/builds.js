@@ -11,6 +11,15 @@ function getGitlabToken() {
   const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'gitlab'").get();
   return row ? JSON.parse(row.value_json).token : '';
 }
+function getAwsEnv() {
+  const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'awsSg'").get();
+  const cfg = row ? JSON.parse(row.value_json) : {};
+  const env = {};
+  if (cfg.accessKeyId) env.AWS_ACCESS_KEY_ID = cfg.accessKeyId;
+  if (cfg.secretAccessKey) env.AWS_SECRET_ACCESS_KEY = cfg.secretAccessKey;
+  if (cfg.region) env.AWS_DEFAULT_REGION = cfg.region;
+  return env;
+}
 
 // GET /api/builds/projects — return all projects with param schemas
 router.get('/projects', (req, res) => {
@@ -85,7 +94,8 @@ router.post('/:project', async (req, res) => {
       (code) => {
         res.write(`\n__EXIT_CODE__${code}`);
         res.end();
-      }
+      },
+      getAwsEnv()
     );
   } catch (err) {
     res.write(`ERROR: ${err.message}\n__EXIT_CODE__1`);
