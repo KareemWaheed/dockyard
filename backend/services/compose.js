@@ -61,6 +61,50 @@ function addEnvVarToCompose(composeContent, serviceName, key, value) {
   return yaml.dump(doc, { lineWidth: -1 });
 }
 
+function labelsToObject(labels) {
+  if (!labels) return {};
+  if (Array.isArray(labels)) {
+    return labels.reduce((acc, entry) => {
+      if (typeof entry !== 'string') return acc;
+      const idx = entry.indexOf('=');
+      if (idx === -1) acc[entry] = 'true';
+      else acc[entry.slice(0, idx)] = entry.slice(idx + 1);
+      return acc;
+    }, {});
+  }
+  return { ...labels };
+}
+
+function mergeLabelsLikeOriginal(originalLabels, nextLabels) {
+  if (Array.isArray(originalLabels)) {
+    return Object.entries(nextLabels).map(([key, value]) => `${key}=${value}`);
+  }
+  return nextLabels;
+}
+
+function getServiceLabel(composeContent, serviceName, labelKey) {
+  const doc = yaml.load(composeContent);
+  const service = doc.services?.[serviceName];
+  if (!service) throw new Error(`Service ${serviceName} not found`);
+  const labels = labelsToObject(service.labels);
+  return labels[labelKey] ?? null;
+}
+
+function setManagedLabelInCompose(composeContent, serviceName, enabled) {
+  const doc = yaml.load(composeContent);
+  const service = doc.services?.[serviceName];
+  if (!service) throw new Error(`Service ${serviceName} not found`);
+
+  const currentLabels = labelsToObject(service.labels);
+  if (enabled) currentLabels['com.dockyard.managed'] = 'true';
+  else delete currentLabels['com.dockyard.managed'];
+
+  if (Object.keys(currentLabels).length === 0) delete service.labels;
+  else service.labels = mergeLabelsLikeOriginal(service.labels, currentLabels);
+
+  return yaml.dump(doc, { lineWidth: -1, quotingType: '"' });
+}
+
 function appendService(composeContent, serviceDef) {
   const doc = yaml.load(composeContent);
   if (!doc.services) doc.services = {};
@@ -97,6 +141,8 @@ module.exports = {
   updateImageInCompose,
   updateEnvVar,
   addEnvVarToCompose,
+  getServiceLabel,
+  setManagedLabelInCompose,
   appendService,
   buildServiceBlock,
 };

@@ -14,7 +14,7 @@ export default function EnvPanel({ env, container, stackPath, onClose, onDone })
   const save = async (key, value) => {
     setBusy(true);
     try {
-      await containerAction(env, container.name, 'update-env', { stackPath, serviceName: container.name, key, value });
+      await containerAction(env, container.name, 'update-env', { stackPath, serviceName: container.serviceName || container.name, key, value });
       onDone(); // refresh parent but don't close
       setEditKey(null);
       setNewKey(''); setNewVal('');

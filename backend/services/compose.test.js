@@ -1,4 +1,5 @@
-const { detectMode, extractVarName, buildServiceBlock } = require('./compose');
+const yaml = require('js-yaml');
+const { detectMode, extractVarName, buildServiceBlock, setManagedLabelInCompose } = require('./compose');
 
 // detectMode: literal image
 console.assert(detectMode('192.0.2.100:5000/my-frontend:test-r15') === 'compose', 'literal → compose mode');
@@ -22,5 +23,12 @@ const block = buildServiceBlock({
 console.assert(block.includes('frontend-client2:'), 'block has service name');
 console.assert(block.includes('com.dockyard.managed: "true"'), 'managed label auto-added');
 console.assert(block.includes('3001:80'), 'port included');
+
+const toggledOn = setManagedLabelInCompose(`services:\n  app:\n    image: nginx:latest\n`, 'app', true);
+console.assert(toggledOn.includes('com.dockyard.managed: "true"'), 'managed label can be added');
+
+const toggledOff = setManagedLabelInCompose(`services:\n  app:\n    image: nginx:latest\n    labels:\n      com.dockyard.managed: "true"\n      com.example.keep: "yes"\n`, 'app', false);
+console.assert(!toggledOff.includes('com.dockyard.managed: "true"'), 'managed label can be removed');
+console.assert(yaml.load(toggledOff).services.app.labels['com.example.keep'] === 'yes', 'other labels are preserved');
 
 console.log('compose tests passed');

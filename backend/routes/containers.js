@@ -1,12 +1,46 @@
 const router = require('express').Router();
 const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
-const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose } = require('../services/compose');
+const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose } = require('../services/compose');
 const { setNote } = require('../notes');
 const { getNote } = require('../notes');
 const { writeHistory } = require('../services/history');
 const { notifyDeploy } = require('../services/notify');
 const path = require('path').posix;
+
+const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
+
+function getServerConfig(server) {
+  return {
+    host: server.host,
+    ssh: {
+      username: server.ssh_username,
+      password: server.ssh_password || undefined,
+      privateKeyPath: server.ssh_key_path || undefined,
+      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
+      passphrase: server.ssh_passphrase || undefined,
+    },
+  };
+}
+
+function readResolvedManagedPassword(composeConfigJson, serviceName) {
+  const service = composeConfigJson?.services?.[serviceName];
+  const environment = service?.environment || {};
+  const envMap = Array.isArray(environment)
+    ? environment.reduce((acc, entry) => {
+        if (typeof entry !== 'string') return acc;
+        const idx = entry.indexOf('=');
+        if (idx === -1) return acc;
+        acc[entry.slice(0, idx)] = entry.slice(idx + 1);
+        return acc;
+      }, {})
+    : environment;
+
+  for (const key of MANAGED_PASSWORD_ENV_KEYS) {
+    if (envMap[key]) return envMap[key];
+  }
+  return null;
+}
 
 router.post('/:env/:containerName/restart', async (req, res) => {
   const { env, containerName } = req.params;
@@ -132,6 +166,47 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   } catch (err) {
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'pull-recreate', success: false, errorMessage: err.message, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'pull-recreate', success: false, error: err.message }).catch(() => {});
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:env/:containerName/toggle-managed', async (req, res) => {
+  const { env, containerName } = req.params;
+  const { stackPath, serviceName, password, enabled, stackName = '' } = req.body;
+  const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
+  if (!stackPath || !serviceName) return res.status(400).json({ error: 'stackPath and serviceName are required' });
+
+  const serverCfg = getServerConfig(server);
+  const dc = server.docker_compose_cmd || 'docker compose';
+  const startTime = Date.now();
+  const noteSnapshot = getNote(env, containerName);
+  const action = enabled ? 'set-managed' : 'unset-managed';
+
+  try {
+    const conn = await connect(env, serverCfg);
+    const configOutput = await exec(conn, `${dc} -f "${stackPath}" config --format json`);
+    const resolvedConfig = JSON.parse(configOutput);
+    const expectedPassword = readResolvedManagedPassword(resolvedConfig, serviceName);
+
+    if (!expectedPassword) {
+      return res.status(400).json({ error: `Managed password is not configured in service environment. Expected one of: ${MANAGED_PASSWORD_ENV_KEYS.join(', ')}` });
+    }
+    if (!password || password !== expectedPassword) {
+      return res.status(403).json({ error: 'Invalid managed password' });
+    }
+
+    const composeContent = await readFile(conn, stackPath);
+    const updatedCompose = setManagedLabelInCompose(composeContent, serviceName, !!enabled);
+    await writeFile(conn, stackPath, updatedCompose);
+    await exec(conn, `${dc} -f "${stackPath}" up -d "${serviceName}"`);
+
+    writeHistory({ env, containerName, serviceName, stackPath, stackName, action, success: true, durationMs: Date.now() - startTime, noteSnapshot });
+    notifyDeploy({ env, container: containerName, action, durationMs: Date.now() - startTime, success: true }).catch(() => {});
+    res.json({ ok: true, managed: !!enabled });
+  } catch (err) {
+    writeHistory({ env, containerName, serviceName, stackPath, stackName, action, success: false, errorMessage: err.message, noteSnapshot });
+    notifyDeploy({ env, container: containerName, action, success: false, error: err.message }).catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });

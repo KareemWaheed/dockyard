@@ -11,14 +11,23 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
   const [envOpen, setEnvOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const serviceName = container.serviceName || name;
 
   const act = async (action, body = {}) => {
     setBusy(true);
     try {
-      await containerAction(env, name, action, { stackPath, serviceName: name, stackName: container.stackName || '', ...body });
+      await containerAction(env, name, action, { stackPath, serviceName, stackName: container.stackName || '', ...body });
       onRefresh();
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
+  };
+
+  const toggleManaged = async (enabled) => {
+    const password = window.prompt(enabled
+      ? 'Enter the managed password to add the label'
+      : 'Enter the managed password to remove the label');
+    if (password === null) return;
+    await act('toggle-managed', { enabled, password });
   };
 
   const imageTag = image?.split(':').pop() || '';
@@ -55,6 +64,7 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
         {managed && <>
           <ActionBtn color="var(--green)"  title="Update image tag"        onClick={() => setTagOpen(true)}                        disabled={busy}>Tag</ActionBtn>
           <ActionBtn color="var(--blue)"   title="View / edit env vars"    onClick={() => setEnvOpen(true)}                        disabled={busy}>Env</ActionBtn>
+          {stackPath && <ActionBtn color="var(--orange)" title="Remove managed label" onClick={() => toggleManaged(false)} disabled={busy}>Unmanage</ActionBtn>}
           <ActionBtn color="var(--yellow)" title="Restart container"       onClick={() => act('restart')}                          disabled={busy}>↻</ActionBtn>
           <ActionBtn color="var(--indigo)" title="docker compose up -d"    onClick={() => act('up')}                               disabled={busy}>▶</ActionBtn>
           <ActionBtn color="var(--orange)" title="Force recreate"          onClick={() => act('up', { forceRecreate: true })}       disabled={busy}>⚡</ActionBtn>
@@ -62,7 +72,10 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
           <ActionBtn color="var(--red)"    title="Stop container"          onClick={() => act('stop')}                              disabled={busy}>■</ActionBtn>
         </>}
         {!managed && (
-          <ActionBtn color="var(--blue)" title="View env vars (read-only)" onClick={() => setEnvOpen(true)} disabled={busy}>Env</ActionBtn>
+          <>
+            <ActionBtn color="var(--blue)" title="View env vars (read-only)" onClick={() => setEnvOpen(true)} disabled={busy}>Env</ActionBtn>
+            {stackPath && <ActionBtn color="var(--green)" title="Add managed label" onClick={() => toggleManaged(true)} disabled={busy}>Manage</ActionBtn>}
+          </>
         )}
         <ActionBtn color="var(--purple)" title="View live logs" onClick={() => setLogsOpen(true)} disabled={busy}>Logs</ActionBtn>
       </div>

@@ -13,6 +13,7 @@ function parseComposePs(output) {
 
   return items.map(item => ({
     name: item.Name || item.Service,
+    serviceName: item.Service || item.Name,
     status: (item.State || item.Status || '').toLowerCase().includes('running') ? 'running' : 'stopped',
     image: item.Image || '',
   }));

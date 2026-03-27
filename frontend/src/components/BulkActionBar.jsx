@@ -12,7 +12,7 @@ export default function BulkActionBar({ env, selected, onClear, onDone }) {
     for (const c of selected) {
       setResults(prev => [...prev, { name: c.name, status: 'running' }]);
       try {
-        await containerAction(env, c.name, action, { stackPath: c.stackPath, serviceName: c.name, ...extraBody });
+        await containerAction(env, c.name, action, { stackPath: c.stackPath, serviceName: c.serviceName || c.name, ...extraBody });
         setResults(prev => prev.map(r => r.name === c.name ? { ...r, status: 'done' } : r));
       } catch (e) {
         setResults(prev => prev.map(r => r.name === c.name ? { ...r, status: 'failed', error: e.message } : r));
