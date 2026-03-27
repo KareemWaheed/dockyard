@@ -66,6 +66,22 @@ db.exec(`
     value_json TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS build_runs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project      TEXT NOT NULL,
+    build_number INTEGER NOT NULL,
+    type         TEXT NOT NULL DEFAULT 'build',
+    status       TEXT NOT NULL DEFAULT 'running',
+    exit_code    INTEGER,
+    log          TEXT NOT NULL DEFAULT '',
+    branch       TEXT,
+    args_json    TEXT,
+    started_at   TEXT NOT NULL,
+    finished_at  TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_build_runs_project_num ON build_runs(project, build_number);
+  CREATE INDEX IF NOT EXISTS idx_build_runs_project ON build_runs(project, id DESC);
+
   CREATE INDEX IF NOT EXISTS idx_deploy_history_env ON deploy_history(env);
   CREATE INDEX IF NOT EXISTS idx_deploy_history_timestamp ON deploy_history(timestamp);
 `);
