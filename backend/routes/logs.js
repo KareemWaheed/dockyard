@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const db = require('../db');
 const { connect } = require('../services/ssh');
+const { subscribeRun } = require('../services/build-manager');
 
 module.exports = function attachLogs(httpServer) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws/logs' });
@@ -59,5 +60,49 @@ module.exports = function attachLogs(httpServer) {
     ws.on('close', () => {
       try { stream?.destroy?.(); } catch {}
     });
+  });
+
+  // ── Build run logs ───────────────────────────────────────────────────────
+  const buildWss = new WebSocketServer({ server: httpServer, path: '/ws/builds' });
+
+  buildWss.on('connection', (ws, req) => {
+    const url = new URL(req.url, 'http://localhost');
+    const runId = parseInt(url.searchParams.get('runId'), 10);
+
+    if (!runId) {
+      ws.send(JSON.stringify({ type: 'error', message: 'runId required' }));
+      return ws.close();
+    }
+
+    const run = db.prepare('SELECT * FROM build_runs WHERE id = ?').get(runId);
+    if (!run) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Run not found' }));
+      return ws.close();
+    }
+
+    const send = (msg) => {
+      if (ws.readyState === 1) ws.send(JSON.stringify(msg));
+    };
+
+    // Replay existing log
+    if (run.log) send({ type: 'chunk', text: run.log });
+
+    // If already finished, send done and close
+    if (run.status !== 'running') {
+      send({ type: 'done', status: run.status, exitCode: run.exit_code });
+      return ws.close();
+    }
+
+    // Subscribe to live stream
+    const unsub = subscribeRun(
+      runId,
+      (chunk) => send({ type: 'chunk', text: chunk }),
+      ({ status, exitCode }) => {
+        send({ type: 'done', status, exitCode });
+        ws.close();
+      }
+    );
+
+    ws.on('close', unsub);
   });
 };
