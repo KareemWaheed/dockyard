@@ -51,7 +51,7 @@ function spawnClone(projectKey, repoUrl, token, onData, onClose) {
 
 function spawnBuild(projectKey, scriptName, args, onData, onClose) {
   const dir = repoDir(projectKey);
-  const scriptPath = path.join(__dirname, '..', '..', 'scripts', scriptName);
+  const scriptPath = path.join(dir, scriptName);
   const proc = spawn('bash', [scriptPath, ...args], { cwd: dir });
   proc.stdout.on('data', (d) => onData(d.toString()));
   proc.stderr.on('data', (d) => onData(d.toString()));
