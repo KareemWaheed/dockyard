@@ -17,6 +17,7 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/awssg', require('./routes/awssg'));
 app.use('/api/history', require('./routes/history'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/flyway', require('./routes/flyway'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }));

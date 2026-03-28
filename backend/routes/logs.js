@@ -2,6 +2,7 @@ const { WebSocketServer } = require('ws');
 const db = require('../db');
 const { connect } = require('../services/ssh');
 const { subscribeRun } = require('../services/build-manager');
+const { subscribeRun: subscribeFlywayRun } = require('../services/flyway-manager');
 
 module.exports = function attachLogs(httpServer) {
   // Single WSS instance — ws@8.x aborts the socket if a path-filtered WSS
@@ -15,6 +16,11 @@ module.exports = function attachLogs(httpServer) {
 
     if (pathname === '/ws/builds') {
       handleBuildWs(ws, url);
+      return;
+    }
+
+    if (pathname === '/ws/flyway') {
+      handleFlywayWs(ws, url);
       return;
     }
 
@@ -115,6 +121,37 @@ module.exports = function attachLogs(httpServer) {
         send({ type: 'done', status, exitCode, commits_json: freshRun?.commits_json || null });
         ws.close();
       }
+    );
+
+    ws.on('close', unsub);
+  }
+
+  function handleFlywayWs(ws, url) {
+    const runId = parseInt(url.searchParams.get('runId'), 10);
+    if (!runId) {
+      ws.send(JSON.stringify({ type: 'error', message: 'runId required' }));
+      return ws.close();
+    }
+
+    const run = db.prepare('SELECT * FROM flyway_runs WHERE id = ?').get(runId);
+    if (!run) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Run not found' }));
+      return ws.close();
+    }
+
+    const send = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+
+    if (run.log) send({ type: 'chunk', text: run.log });
+
+    if (run.status !== 'running') {
+      send({ type: 'done', status: run.status, exitCode: run.exit_code });
+      return ws.close();
+    }
+
+    const unsub = subscribeFlywayRun(
+      runId,
+      (chunk) => send({ type: 'chunk', text: chunk }),
+      ({ status, exitCode }) => { send({ type: 'done', status, exitCode }); ws.close(); }
     );
 
     ws.on('close', unsub);
