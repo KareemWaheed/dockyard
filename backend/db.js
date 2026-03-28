@@ -86,6 +86,44 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_deploy_history_timestamp ON deploy_history(timestamp);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS flyway_envs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    description TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS flyway_databases (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    env_id              INTEGER NOT NULL REFERENCES flyway_envs(id) ON DELETE CASCADE,
+    name                TEXT NOT NULL,
+    url                 TEXT NOT NULL,
+    db_user             TEXT NOT NULL,
+    db_password         TEXT NOT NULL,
+    schemas             TEXT NOT NULL,
+    locations           TEXT NOT NULL DEFAULT 'filesystem:src/main/resources/db/migration/',
+    baseline_on_migrate INTEGER NOT NULL DEFAULT 1,
+    baseline_version    TEXT NOT NULL DEFAULT '1'
+  );
+
+  CREATE TABLE IF NOT EXISTS flyway_runs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_number   INTEGER NOT NULL,
+    env_id       INTEGER NOT NULL,
+    db_id        INTEGER NOT NULL,
+    project      TEXT NOT NULL,
+    branch       TEXT NOT NULL,
+    command      TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'running',
+    exit_code    INTEGER,
+    log          TEXT NOT NULL DEFAULT '',
+    started_at   TEXT NOT NULL,
+    finished_at  TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_flyway_runs_recent ON flyway_runs(id DESC);
+`);
+
 // Column migrations — tolerate "duplicate column" errors for idempotency
 try { db.exec("ALTER TABLE build_runs ADD COLUMN commits_json TEXT"); } catch {}
 
