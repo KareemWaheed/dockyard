@@ -172,4 +172,22 @@ function subscribeRun(runId, onChunk, onDone) {
   };
 }
 
-module.exports = { startBuildRun, startCloneRun, cancelRun, subscribeRun };
+function hydrateQueue() {
+  const queued = db.prepare(
+    "SELECT id, project, build_number, branch, args_json FROM build_runs WHERE status = 'queued' ORDER BY id ASC"
+  ).all();
+  if (queued.length === 0) return;
+
+  for (const row of queued) {
+    const args = (() => { try { return JSON.parse(row.args_json || '[]'); } catch { return []; } })();
+    buildQueue.push({ project: row.project, branch: row.branch, args, awsEnv: {}, runId: row.id, buildNumber: row.build_number });
+  }
+
+  // Kick off the first one — rest will dequeue naturally via _dequeueNext.
+  buildRunning = true;
+  const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
+  db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
+  _runBuild(project, branch, args, awsEnv, runId, buildNumber);
+}
+
+module.exports = { startBuildRun, startCloneRun, cancelRun, subscribeRun, hydrateQueue };

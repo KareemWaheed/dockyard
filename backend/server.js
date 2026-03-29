@@ -4,6 +4,8 @@ const http = require('http');
 
 // Must be first — initializes SQLite and runs migration if needed
 require('./db');
+const { hydrateQueue } = require('./services/build-manager');
+hydrateQueue();
 
 const app = express();
 app.use(cors());
