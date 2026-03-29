@@ -97,6 +97,7 @@ export default function BuildView() {
   const [loading, setLoading] = useState(true);
   const outputRef = useRef(null);
   const wsRef = useRef(null);
+  const [stuckAlert, setStuckAlert] = useState(false);
 
   useEffect(() => {
     fetchProjects().then(data => {
@@ -121,13 +122,16 @@ export default function BuildView() {
     setSelectedRunId(run.id);
     setLiveLog('');
     setLiveStatus(run.status !== 'running' ? run.status : null);
+    setStuckAlert(false);
 
     const ws = new WebSocket(`${wsBase()}/ws/builds?runId=${run.id}`);
     wsRef.current = ws;
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'chunk') setLiveLog(prev => prev + msg.text);
+      if (msg.type === 'chunk') { setStuckAlert(false); setLiveLog(prev => prev + msg.text); }
+      if (msg.type === 'stuck_alert') setStuckAlert(true);
       if (msg.type === 'done') {
+        setStuckAlert(false);
         setLiveStatus(msg.status);
         setRuns(prev => prev.map(r => r.id === run.id
           ? { ...r, status: msg.status, commits_json: msg.commits_json ?? r.commits_json }
@@ -245,7 +249,7 @@ export default function BuildView() {
   };
 
   const selectedRun = runs.find(r => r.id === selectedRunId);
-  const isSelectedRunning = selectedRun?.status === 'running';
+  const isSelectedActive = selectedRun?.status === 'running' || selectedRun?.status === 'queued';
 
   const parsedParams = selectedRun?.type === 'build'
     ? parseArgsToParams(params, selectedRun?.args_json, selectedRun?.branch)
@@ -311,31 +315,40 @@ export default function BuildView() {
           <div style={{ marginTop: 20 }}>
             <div className="build-recent-label" style={{ marginBottom: 6 }}>Runs</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {runs.map(run => (
-                <button
-                  key={run.id}
-                  onClick={() => openRun(run)}
-                  style={{
-                    background: selectedRunId === run.id ? 'var(--surface-hover)' : 'transparent',
-                    border: 'none',
-                    borderRadius: 4,
-                    padding: '5px 8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    textAlign: 'left',
-                    width: '100%',
-                  }}
-                >
-                  <span style={{ color: 'var(--text)', fontSize: 12 }}>
-                    #{run.build_number} {run.type === 'clone' ? 'clone' : run.branch || ''}
-                  </span>
-                  <span style={{ color: statusColor(run.status), fontSize: 11 }}>
-                    {statusLabel(run.status)}
-                  </span>
-                </button>
-              ))}
+              {runs.map(run => {
+                const queuedRuns = runs.filter(r => r.status === 'queued').sort((a, b) => a.id - b.id);
+                const queuePos = run.status === 'queued' ? queuedRuns.findIndex(r => r.id === run.id) + 1 : null;
+                return (
+                  <button
+                    key={run.id}
+                    onClick={() => openRun(run)}
+                    style={{
+                      background: selectedRunId === run.id ? 'var(--surface-hover)' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '5px 8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                  >
+                    <span style={{ color: 'var(--text)', fontSize: 12 }}>
+                      #{run.build_number} {run.type === 'clone' ? 'clone' : run.branch || ''}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ color: statusColor(run.status), fontSize: 11 }}>
+                        {statusLabel(run.status)}
+                      </span>
+                      {queuePos !== null && (
+                        <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>pos {queuePos}</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -346,11 +359,11 @@ export default function BuildView() {
         <div className="build-output-header">
           <span>{selectedRun ? `#${selectedRun.build_number} — ${selectedRun.type}` : 'Output'}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isSelectedRunning && (
+            {isSelectedActive && (
               <>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span className="status-dot running" />
-                  <span style={{ color: 'var(--green)', letterSpacing: 0 }}>running</span>
+                  <span style={{ color: 'var(--green)', letterSpacing: 0 }}>{selectedRun?.status}</span>
                 </span>
                 <button
                   onClick={handleCancel}
@@ -360,10 +373,10 @@ export default function BuildView() {
                 </button>
               </>
             )}
-            {liveStatus && !isSelectedRunning && (
+            {liveStatus && !isSelectedActive && (
               <span style={{ color: statusColor(liveStatus), fontSize: 12 }}>{statusLabel(liveStatus)}</span>
             )}
-            {selectedRun?.type === 'build' && !isSelectedRunning && (
+            {selectedRun?.type === 'build' && !isSelectedActive && (
               <button
                 onClick={handleReplay}
                 style={{ background: 'rgba(122,162,247,0.12)', color: 'var(--blue)', border: '1px solid rgba(122,162,247,0.25)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
@@ -398,6 +411,11 @@ export default function BuildView() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+        {stuckAlert && (
+          <div style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '6px 12px', margin: '0 0 6px', color: 'var(--yellow, #f59e0b)', fontSize: 12 }}>
+            ⚠ No output detected — this build may be stuck.
           </div>
         )}
         <div className="build-output-terminal" ref={outputRef}>
