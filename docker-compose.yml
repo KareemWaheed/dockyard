@@ -2,6 +2,11 @@ services:
   dockyard:
     image: kareemwaheed/dockyard:latest
     restart: unless-stopped
+    environment:
+      # Minutes of silence before a build is flagged as possibly stuck (default: 15)
+      # BUILD_STUCK_ALERT_MINUTES: 15
+      # Minutes of silence before a build is auto-cancelled (default: 30)
+      # BUILD_STUCK_CANCEL_MINUTES: 30
     ports:
       - "3000:80"
     volumes:
@@ -10,8 +15,10 @@ services:
       # - ./scripts:/scripts:ro
       - data:/data
       - repos:/repos
+      - m2:/root/.m2
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   repos:
   data:
+  m2:
