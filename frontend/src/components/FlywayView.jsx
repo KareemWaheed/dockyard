@@ -4,6 +4,7 @@ import {
   fetchProjects, fetchBranches,
   fetchFlywayEnvs, startFlywayRun, fetchFlywayRuns, cancelFlywayRun,
 } from '../api';
+import SearchableSelect from './SearchableSelect';
 
 function wsBase() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -191,11 +192,7 @@ export default function FlywayView() {
               ? <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Fetching…</span>
               : needsClone
                 ? <span style={{ color: 'var(--yellow, #f59e0b)', fontSize: 11 }}>Clone repo first via Build view</span>
-                : (
-                  <select value={branch} onChange={e => setBranch(e.target.value)}>
-                    {branches.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                )
+                : <SearchableSelect value={branch} options={branches} onChange={setBranch} />
             }
           </div>
 
