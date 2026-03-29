@@ -31,6 +31,7 @@ function appendLog(runId, chunk) {
 
 function finishRun(runId, exitCode) {
   if (!activeProcesses.has(runId) && !cancelledRuns.has(runId)) return;
+  const runRow = db.prepare('SELECT type FROM build_runs WHERE id = ?').get(runId);
   const status = cancelledRuns.has(runId) ? 'cancelled'
     : exitCode === 0 ? 'success' : 'failed';
   cancelledRuns.delete(runId);
@@ -39,7 +40,7 @@ function finishRun(runId, exitCode) {
   ).run(status, exitCode, runId);
   activeProcesses.delete(runId);
   emitter.emit(`run:${runId}:done`, { exitCode, status });
-  _dequeueNext();
+  if (runRow?.type === 'build') _dequeueNext();
 }
 
 function _dequeueNext() {
@@ -47,6 +48,7 @@ function _dequeueNext() {
     buildRunning = false;
     return;
   }
+  buildRunning = true;
   const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
   db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
   _runBuild(project, branch, args, awsEnv, runId, buildNumber);
