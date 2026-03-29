@@ -90,8 +90,8 @@ router.post('/:project', async (req, res) => {
   }
 
   writeAwsConfig();
-  const { runId, buildNumber } = startBuildRun(project, branch, args, getAwsEnv());
-  res.json({ runId, buildNumber });
+  const { runId, buildNumber, queued } = startBuildRun(project, branch, args, getAwsEnv());
+  res.json({ runId, buildNumber, queued });
 });
 
 // GET /api/builds/:project/runs — list last 50 runs (no log)
@@ -124,8 +124,8 @@ router.post('/:project/runs/:num/replay', (req, res) => {
 
   writeAwsConfig();
   const args = (() => { try { return JSON.parse(run.args_json || '[]'); } catch { return []; } })();
-  const { runId, buildNumber } = startBuildRun(project, run.branch, args, getAwsEnv());
-  res.json({ runId, buildNumber });
+  const { runId, buildNumber, queued } = startBuildRun(project, run.branch, args, getAwsEnv());
+  res.json({ runId, buildNumber, queued });
 });
 
 // DELETE /api/builds/:project/runs/:num — cancel

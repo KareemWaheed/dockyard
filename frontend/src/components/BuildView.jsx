@@ -46,12 +46,14 @@ function statusColor(status) {
   if (status === 'success') return 'var(--green)';
   if (status === 'failed') return 'var(--red)';
   if (status === 'cancelled') return 'var(--text-dim)';
+  if (status === 'queued') return 'var(--text-dim)';
   return 'var(--yellow, #f59e0b)';
 }
 function statusLabel(status) {
   if (status === 'running') return '● running';
   if (status === 'success') return '✓ success';
   if (status === 'failed') return '✗ failed';
+  if (status === 'queued') return '◌ queued';
   return '○ cancelled';
 }
 function wsBase() {
@@ -199,7 +201,14 @@ export default function BuildView() {
     setRecent(loadRecent());
     try {
       const result = await startBuild(activeProject, branch, args);
-      const run = { id: result.runId, build_number: result.buildNumber, type: 'build', status: 'running', branch, started_at: new Date().toISOString() };
+      const run = {
+        id: result.runId,
+        build_number: result.buildNumber,
+        type: 'build',
+        status: result.queued ? 'queued' : 'running',
+        branch,
+        started_at: new Date().toISOString(),
+      };
       setRuns(prev => [run, ...prev]);
       openRun(run);
     } catch (err) { console.error(err); }
@@ -213,7 +222,7 @@ export default function BuildView() {
         id: result.runId,
         build_number: result.buildNumber,
         type: 'build',
-        status: 'running',
+        status: result.queued ? 'queued' : 'running',
         branch: selectedRun.branch,
         args_json: selectedRun.args_json,
         started_at: new Date().toISOString(),
@@ -294,8 +303,8 @@ export default function BuildView() {
           <ParamField key={p.name} param={p} value={form[p.name]} onChange={v => setField(p.name, v)} />
         ))}
 
-        <button className="btn-build" onClick={handleBuild} disabled={!canBuild || isRunning}>
-          {isRunning ? 'Building…' : '>> Build & Push'}
+        <button className="btn-build" onClick={handleBuild} disabled={!canBuild}>
+          {'>> Build & Push'}
         </button>
 
         {runs.length > 0 && (
@@ -357,8 +366,7 @@ export default function BuildView() {
             {selectedRun?.type === 'build' && !isSelectedRunning && (
               <button
                 onClick={handleReplay}
-                disabled={isRunning}
-                style={{ background: 'rgba(122,162,247,0.12)', color: 'var(--blue)', border: '1px solid rgba(122,162,247,0.25)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.5 : 1 }}
+                style={{ background: 'rgba(122,162,247,0.12)', color: 'var(--blue)', border: '1px solid rgba(122,162,247,0.25)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
               >
                 ↺ Replay
               </button>
