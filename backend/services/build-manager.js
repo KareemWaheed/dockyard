@@ -6,6 +6,12 @@ const { spawnBuild, spawnClone, checkoutAndPull, getRecentCommits } = require('.
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
+const STUCK_ALERT_MS  = parseInt(process.env.BUILD_STUCK_ALERT_MINUTES  || '15', 10) * 60_000;
+const STUCK_CANCEL_MS = parseInt(process.env.BUILD_STUCK_CANCEL_MINUTES || '30', 10) * 60_000;
+
+const lastActivityAt = new Map(); // runId → Date
+const alertedRuns    = new Set(); // runIds that have already triggered an alert
+
 // runId → ChildProcess
 const activeProcesses = new Map();
 
@@ -26,6 +32,7 @@ function nextBuildNumber(project) {
 
 function appendLog(runId, chunk) {
   db.prepare('UPDATE build_runs SET log = log || ? WHERE id = ?').run(chunk, runId);
+  lastActivityAt.set(runId, new Date());
   emitter.emit(`run:${runId}:chunk`, chunk);
 }
 
@@ -39,6 +46,8 @@ function finishRun(runId, exitCode) {
     "UPDATE build_runs SET status = ?, exit_code = ?, finished_at = datetime('now') WHERE id = ?"
   ).run(status, exitCode, runId);
   activeProcesses.delete(runId);
+  lastActivityAt.delete(runId);
+  alertedRuns.delete(runId);
   if (runRow) console.log(`[BUILD] Build #${runRow.build_number} for ${runRow.project} finished — status: ${status}, exit: ${exitCode}`);
   emitter.emit(`run:${runId}:done`, { exitCode, status });
   if (runRow?.type === 'build') _dequeueNext();
@@ -200,5 +209,33 @@ function hydrateQueue() {
   db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
   _runBuild(project, branch, args, awsEnv, runId, buildNumber);
 }
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [runId] of activeProcesses) {
+    const last = lastActivityAt.get(runId);
+    if (!last) continue;
+    const silence = now - last.getTime();
+
+    if (silence >= STUCK_CANCEL_MS) {
+      const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
+      const mins = Math.floor(silence / 60_000);
+      appendLog(runId, `\n[Auto-cancelled: no output for ${mins} minutes]\n`);
+      console.log(`[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — auto-cancelled after ${mins}m of silence`);
+      const proc = activeProcesses.get(runId);
+      cancelledRuns.add(runId);
+      if (proc) {
+        try { process.kill(-proc.pid, 'SIGTERM'); } catch { proc.kill('SIGTERM'); }
+      }
+    } else if (silence >= STUCK_ALERT_MS && !alertedRuns.has(runId)) {
+      const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
+      const mins = Math.floor(silence / 60_000);
+      appendLog(runId, `\n[WARNING: no output for ${mins} minutes — build may be stuck]\n`);
+      emitter.emit(`run:${runId}:stuck_alert`);
+      alertedRuns.add(runId);
+      console.log(`[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — no output for ${mins}m, alert sent`);
+    }
+  }
+}, 60_000);
 
 module.exports = { startBuildRun, startCloneRun, cancelRun, subscribeRun, hydrateQueue };
