@@ -131,6 +131,15 @@ function startCloneRun(project, repoUrl, token) {
 }
 
 function cancelRun(runId) {
+  // If the run is waiting in the queue (not yet started), remove it directly.
+  const queueIdx = buildQueue.findIndex(j => j.runId === runId);
+  if (queueIdx !== -1) {
+    buildQueue.splice(queueIdx, 1);
+    db.prepare("UPDATE build_runs SET status = 'cancelled', finished_at = datetime('now') WHERE id = ?").run(runId);
+    emitter.emit(`run:${runId}:done`, { exitCode: null, status: 'cancelled' });
+    return true;
+  }
+
   if (!activeProcesses.has(runId)) return false;
   const proc = activeProcesses.get(runId);
   cancelledRuns.add(runId);
