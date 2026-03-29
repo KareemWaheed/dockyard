@@ -37,6 +37,12 @@ export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChan
           &gt;&gt; Build
         </button>
         <button
+          className={`sidebar-item ${activeView === 'flyway' ? 'active' : ''}`}
+          onClick={() => onViewChange('flyway')}
+        >
+          ~~ Flyway
+        </button>
+        <button
           className={`sidebar-item ${activeView === 'history' ? 'active' : ''}`}
           onClick={() => onViewChange('history')}
         >

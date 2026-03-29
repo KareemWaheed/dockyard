@@ -6,6 +6,7 @@ import DashboardView from './components/DashboardView';
 import BuildView from './components/BuildView';
 import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
+import FlywayView from './components/FlywayView';
 import CommandPalette from './components/CommandPalette';
 
 const POLL_MS = 30000;
@@ -134,6 +135,7 @@ export default function AppShell() {
           />
         )}
         {activeView === 'build' && <BuildView />}
+        {activeView === 'flyway' && <FlywayView />}
         {activeView === 'history' && <HistoryView />}
         {activeView === 'settings' && <SettingsView />}
       </div>

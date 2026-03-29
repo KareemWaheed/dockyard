@@ -4,6 +4,7 @@ import NotificationsTab from './settings/NotificationsTab';
 import GitLabTab from './settings/GitLabTab';
 import AwsTab from './settings/AwsTab';
 import BuildProjectsTab from './settings/BuildProjectsTab';
+import FlywayTab from './settings/FlywayTab';
 
 const TABS = [
   { id: 'servers', label: 'Servers', Component: ServersTab },
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'gitlab', label: 'GitLab', Component: GitLabTab },
   { id: 'aws', label: 'AWS', Component: AwsTab },
   { id: 'buildProjects', label: 'Build Projects', Component: BuildProjectsTab },
+  { id: 'flyway', label: 'Flyway', Component: FlywayTab },
 ];
 
 export default function SettingsView() {
