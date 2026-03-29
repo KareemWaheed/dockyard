@@ -115,11 +115,34 @@ export default function BuildProjectsTab() {
       {proj && (
         <>
           {/* Project fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end', marginBottom: 16 }}>
-            <label>Display Name<input value={proj.name} onChange={e => updateProject('name', e.target.value)} /></label>
-            <label>Repository URL<input value={proj.repo || ''} onChange={e => updateProject('repo', e.target.value)} /></label>
-            <label>Build Script<input value={proj.buildScript || ''} onChange={e => updateProject('buildScript', e.target.value)} placeholder="my-build.sh" /></label>
-            <button onClick={removeProject} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>Delete Project</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+              <label>Display Name<input value={proj.name} onChange={e => updateProject('name', e.target.value)} /></label>
+              <label>Repository URL<input value={proj.repo || ''} onChange={e => updateProject('repo', e.target.value)} /></label>
+              <label>Build Script<input value={proj.buildScript || ''} onChange={e => updateProject('buildScript', e.target.value)} placeholder="my-build.sh" /></label>
+              <button onClick={removeProject} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>Delete Project</button>
+            </div>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}>
+                <input
+                  type="checkbox"
+                  checked={!!proj.isFlyway}
+                  onChange={e => updateProject('isFlyway', e.target.checked)}
+                />
+                Flyway project
+              </label>
+              {proj.isFlyway && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)', flex: 1 }}>
+                  Flyway path (subdirectory for mvn):
+                  <input
+                    value={proj.flywayPath || ''}
+                    onChange={e => updateProject('flywayPath', e.target.value)}
+                    placeholder="e.g. Web/IrrigationApi"
+                    style={{ flex: 1 }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Parameters */}
