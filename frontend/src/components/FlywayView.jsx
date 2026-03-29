@@ -290,7 +290,7 @@ export default function FlywayView() {
                   </td>
                   <td style={{ color: statusColor(run.status) }}>{statusLabel(run.status)}</td>
                   <td style={{ color: 'var(--text-dim)' }}>
-                    {run.started_at ? new Date(run.started_at + 'Z').toLocaleString() : ''}
+                    {run.started_at ? new Date(run.started_at.endsWith('Z') ? run.started_at : run.started_at + 'Z').toLocaleString() : ''}
                   </td>
                 </tr>
               ))}

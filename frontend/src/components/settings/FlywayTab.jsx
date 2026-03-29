@@ -51,7 +51,7 @@ export default function FlywayTab() {
     setDbEnvId(envId);
     setDbForm({
       name: d.name, url: d.url, db_user: d.db_user, db_password: '',
-      schemas: d.schemas, locations: d.locations,
+      schemas: d.schemas, locations: d.locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate: !!d.baseline_on_migrate, baseline_version: d.baseline_version,
     });
   };
@@ -59,7 +59,7 @@ export default function FlywayTab() {
 
   const saveDb = async () => {
     const { name, url, db_user, db_password, schemas } = dbForm;
-    if (!name || !url || !db_user || !schemas) return;
+    if (!name || !url || !db_user || !schemas) { alert('Name, URL, username and schemas are required'); return; }
     if (editDbId) {
       await updateFlywayDatabase(editDbId, dbForm);
     } else {
