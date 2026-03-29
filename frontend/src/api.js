@@ -215,3 +215,75 @@ export async function updateAppConfig(key, body) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+// ─── Flyway ───────────────────────────────────────────────────────────────────
+
+export async function fetchFlywayEnvs() {
+  const r = await fetch(`${BASE}/flyway/envs`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function createFlywayEnv(body) {
+  const r = await fetch(`${BASE}/flyway/envs`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateFlywayEnv(id, body) {
+  const r = await fetch(`${BASE}/flyway/envs/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteFlywayEnv(id) {
+  const r = await fetch(`${BASE}/flyway/envs/${id}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function createFlywayDatabase(envId, body) {
+  const r = await fetch(`${BASE}/flyway/envs/${envId}/databases`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateFlywayDatabase(id, body) {
+  const r = await fetch(`${BASE}/flyway/databases/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteFlywayDatabase(id) {
+  const r = await fetch(`${BASE}/flyway/databases/${id}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function startFlywayRun(body) {
+  const r = await fetch(`${BASE}/flyway/run`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function fetchFlywayRuns() {
+  const r = await fetch(`${BASE}/flyway/runs`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function cancelFlywayRun(id) {
+  const r = await fetch(`${BASE}/flyway/runs/${id}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
