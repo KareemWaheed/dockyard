@@ -31,7 +31,7 @@ function appendLog(runId, chunk) {
 
 function finishRun(runId, exitCode) {
   if (!activeProcesses.has(runId) && !cancelledRuns.has(runId)) return;
-  const runRow = db.prepare('SELECT type FROM build_runs WHERE id = ?').get(runId);
+  const runRow = db.prepare('SELECT type, project, build_number FROM build_runs WHERE id = ?').get(runId);
   const status = cancelledRuns.has(runId) ? 'cancelled'
     : exitCode === 0 ? 'success' : 'failed';
   cancelledRuns.delete(runId);
@@ -39,6 +39,7 @@ function finishRun(runId, exitCode) {
     "UPDATE build_runs SET status = ?, exit_code = ?, finished_at = datetime('now') WHERE id = ?"
   ).run(status, exitCode, runId);
   activeProcesses.delete(runId);
+  if (runRow) console.log(`[BUILD] Build #${runRow.build_number} for ${runRow.project} finished — status: ${status}, exit: ${exitCode}`);
   emitter.emit(`run:${runId}:done`, { exitCode, status });
   if (runRow?.type === 'build') _dequeueNext();
 }
@@ -51,6 +52,7 @@ function _dequeueNext() {
   buildRunning = true;
   const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
   db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
+  console.log(`[QUEUE] Dequeued build #${buildNumber} for ${project}, queue depth: ${buildQueue.length}`);
   _runBuild(project, branch, args, awsEnv, runId, buildNumber);
 }
 
@@ -91,6 +93,7 @@ function _runBuild(project, branch, args, awsEnv, runId, buildNumber) {
     awsEnv
   );
   activeProcesses.set(runId, proc);
+  if (proc?.pid) console.log(`[BUILD] Starting build #${buildNumber} for ${project} — branch: ${branch}, PID: ${proc.pid}`);
 }
 
 function startBuildRun(project, branch, args, awsEnv) {
@@ -104,6 +107,7 @@ function startBuildRun(project, branch, args, awsEnv) {
 
   if (buildRunning) {
     buildQueue.push({ project, branch, args, awsEnv, runId, buildNumber });
+    console.log(`[QUEUE] Build #${buildNumber} for ${project} queued at position ${buildQueue.length}`);
     return { runId, buildNumber, queued: true };
   }
 
@@ -135,6 +139,8 @@ function cancelRun(runId) {
   const queueIdx = buildQueue.findIndex(j => j.runId === runId);
   if (queueIdx !== -1) {
     buildQueue.splice(queueIdx, 1);
+    const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
+    if (runRow) console.log(`[BUILD] Build #${runRow.build_number} for ${runRow.project} cancelled (was queued)`);
     db.prepare("UPDATE build_runs SET status = 'cancelled', finished_at = datetime('now') WHERE id = ?").run(runId);
     emitter.emit(`run:${runId}:done`, { exitCode: null, status: 'cancelled' });
     return true;
@@ -182,6 +188,7 @@ function hydrateQueue() {
     const args = (() => { try { return JSON.parse(row.args_json || '[]'); } catch { return []; } })();
     buildQueue.push({ project: row.project, branch: row.branch, args, awsEnv: {}, runId: row.id, buildNumber: row.build_number });
   }
+  console.log(`[QUEUE] Re-hydrated ${queued.length} queued build(s) from DB on startup`);
 
   // Kick off the first one — rest will dequeue naturally via _dequeueNext.
   buildRunning = true;
