@@ -160,21 +160,25 @@ function cancelRun(runId) {
   return true;
 }
 
-function subscribeRun(runId, onChunk, onDone) {
+function subscribeRun(runId, onChunk, onDone, onStuckAlert) {
   const chunkKey = `run:${runId}:chunk`;
-  const doneKey = `run:${runId}:done`;
+  const doneKey  = `run:${runId}:done`;
+  const stuckKey = `run:${runId}:stuck_alert`;
 
   const doneWrapper = (result) => {
     emitter.off(chunkKey, onChunk);
+    if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
     onDone(result);
   };
 
   emitter.on(chunkKey, onChunk);
   emitter.once(doneKey, doneWrapper);
+  if (onStuckAlert) emitter.on(stuckKey, onStuckAlert);
 
   return () => {
     emitter.off(chunkKey, onChunk);
     emitter.off(doneKey, doneWrapper);
+    if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
   };
 }
 

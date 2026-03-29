@@ -135,7 +135,9 @@ router.delete('/:project/runs/:num', (req, res) => {
     'SELECT * FROM build_runs WHERE project = ? AND build_number = ?'
   ).get(project, parseInt(num, 10));
   if (!run) return res.status(404).json({ error: 'Run not found' });
-  if (run.status !== 'running') return res.status(400).json({ error: 'Run is not active' });
+  if (run.status !== 'running' && run.status !== 'queued') {
+    return res.status(400).json({ error: 'Run is not active' });
+  }
   const cancelled = cancelRun(run.id);
   res.json({ cancelled });
 });

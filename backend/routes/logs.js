@@ -106,8 +106,8 @@ module.exports = function attachLogs(httpServer) {
     // Replay existing log
     if (run.log) send({ type: 'chunk', text: run.log });
 
-    // If already finished, send done and close
-    if (run.status !== 'running') {
+    // If already finished (not running and not queued), send done immediately.
+    if (run.status !== 'running' && run.status !== 'queued') {
       send({ type: 'done', status: run.status, exitCode: run.exit_code });
       return ws.close();
     }
@@ -120,7 +120,8 @@ module.exports = function attachLogs(httpServer) {
         const freshRun = db.prepare('SELECT commits_json FROM build_runs WHERE id = ?').get(runId);
         send({ type: 'done', status, exitCode, commits_json: freshRun?.commits_json || null });
         ws.close();
-      }
+      },
+      () => send({ type: 'stuck_alert' })
     );
 
     ws.on('close', unsub);
