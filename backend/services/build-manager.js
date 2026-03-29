@@ -13,6 +13,10 @@ const activeProcesses = new Map();
 // maps to 'cancelled' rather than 'failed', avoiding a double-finishRun race.
 const cancelledRuns = new Set();
 
+// Global build queue — only one build runs at a time.
+const buildQueue = [];   // [{ project, branch, args, awsEnv, runId, buildNumber }]
+let buildRunning = false;
+
 function nextBuildNumber(project) {
   const row = db.prepare(
     'SELECT MAX(build_number) as n FROM build_runs WHERE project = ?'
@@ -26,7 +30,6 @@ function appendLog(runId, chunk) {
 }
 
 function finishRun(runId, exitCode) {
-  // Guard: if already finished (removed from both maps), do nothing.
   if (!activeProcesses.has(runId) && !cancelledRuns.has(runId)) return;
   const status = cancelledRuns.has(runId) ? 'cancelled'
     : exitCode === 0 ? 'success' : 'failed';
@@ -36,24 +39,31 @@ function finishRun(runId, exitCode) {
   ).run(status, exitCode, runId);
   activeProcesses.delete(runId);
   emitter.emit(`run:${runId}:done`, { exitCode, status });
+  _dequeueNext();
 }
 
-function startBuildRun(project, branch, args, awsEnv) {
-  const buildNumber = nextBuildNumber(project);
-  const info = db.prepare(
-    "INSERT INTO build_runs (project, build_number, type, status, branch, args_json, started_at) VALUES (?, ?, 'build', 'running', ?, ?, datetime('now'))"
-  ).run(project, buildNumber, branch, JSON.stringify(args));
-  const runId = info.lastInsertRowid;
+function _dequeueNext() {
+  if (buildQueue.length === 0) {
+    buildRunning = false;
+    return;
+  }
+  const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
+  db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
+  _runBuild(project, branch, args, awsEnv, runId, buildNumber);
+}
 
+// Internal: execute a build that has already been inserted into build_runs.
+// Called both for immediate runs and when dequeuing.
+function _runBuild(project, branch, args, awsEnv, runId, buildNumber) {
   const cfgRow = db.prepare("SELECT value_json FROM app_config WHERE key = 'projects'").get();
   const projects = cfgRow ? JSON.parse(cfgRow.value_json) : {};
   const proj = projects[project];
   if (!proj) {
     appendLog(runId, `ERROR: Project '${project}' not found\n`);
-    // Manually mark as failed since activeProcesses doesn't have this runId yet
     db.prepare("UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?").run(runId);
     emitter.emit(`run:${runId}:done`, { exitCode: 1, status: 'failed' });
-    return { runId, buildNumber };
+    _dequeueNext();
+    return;
   }
 
   appendLog(runId, `Checking out ${branch}...\n`);
@@ -63,15 +73,15 @@ function startBuildRun(project, branch, args, awsEnv) {
     appendLog(runId, `ERROR: ${err.message}\n`);
     db.prepare("UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?").run(runId);
     emitter.emit(`run:${runId}:done`, { exitCode: 1, status: 'failed' });
-    return { runId, buildNumber };
+    _dequeueNext();
+    return;
   }
 
-  // Capture the last 3 commits on this branch after checkout
   const commits = getRecentCommits(project);
   db.prepare('UPDATE build_runs SET commits_json = ? WHERE id = ?').run(JSON.stringify(commits), runId);
 
   appendLog(runId, `Running ${proj.buildScript}...\n`);
-  activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
+  activeProcesses.set(runId, null);
   const proc = spawnBuild(
     project, proj.buildScript, args,
     (chunk) => appendLog(runId, chunk),
@@ -79,7 +89,25 @@ function startBuildRun(project, branch, args, awsEnv) {
     awsEnv
   );
   activeProcesses.set(runId, proc);
-  return { runId, buildNumber };
+}
+
+function startBuildRun(project, branch, args, awsEnv) {
+  const buildNumber = nextBuildNumber(project);
+  const status = buildRunning ? 'queued' : 'running';
+
+  const info = db.prepare(
+    "INSERT INTO build_runs (project, build_number, type, status, branch, args_json, started_at) VALUES (?, ?, 'build', ?, ?, ?, datetime('now'))"
+  ).run(project, buildNumber, status, branch, JSON.stringify(args));
+  const runId = info.lastInsertRowid;
+
+  if (buildRunning) {
+    buildQueue.push({ project, branch, args, awsEnv, runId, buildNumber });
+    return { runId, buildNumber, queued: true };
+  }
+
+  buildRunning = true;
+  _runBuild(project, branch, args, awsEnv, runId, buildNumber);
+  return { runId, buildNumber, queued: false };
 }
 
 function startCloneRun(project, repoUrl, token) {
