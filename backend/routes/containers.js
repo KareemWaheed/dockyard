@@ -10,6 +10,25 @@ const path = require('path').posix;
 
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
+const ECR_REGISTRY_RE = /^(\d+\.dkr\.ecr\.([\w-]+)\.amazonaws\.com)\//;
+
+function getAwsConfig() {
+  const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'awsSg'").get();
+  return row ? JSON.parse(row.value_json) : {};
+}
+
+async function ecrLoginIfNeeded(conn, image) {
+  const m = ECR_REGISTRY_RE.exec(image);
+  if (!m) return;
+  const registry = m[1];
+  const region = m[2];
+  const cfg = getAwsConfig();
+  const envPrefix = cfg.accessKeyId && cfg.secretAccessKey
+    ? `AWS_ACCESS_KEY_ID=${cfg.accessKeyId} AWS_SECRET_ACCESS_KEY=${cfg.secretAccessKey} AWS_DEFAULT_REGION=${region} `
+    : '';
+  await exec(conn, `${envPrefix}aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${registry}`);
+}
+
 function getServerConfig(server) {
   return {
     host: server.host,
@@ -146,6 +165,10 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
+    const composeContentForEcr = await readFile(conn, stackPath).catch(() => '');
+    const composeDocForEcr = require('js-yaml').load(composeContentForEcr);
+    const imageForEcr = composeDocForEcr?.services?.[serviceName]?.image || '';
+    await ecrLoginIfNeeded(conn, imageForEcr);
     await exec(conn, `${dc} -f "${stackPath}" pull "${serviceName}"`);
     await exec(conn, `${dc} -f "${stackPath}" up -d --force-recreate "${serviceName}"`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'pull-recreate', success: true, durationMs: Date.now() - startTime, noteSnapshot });
@@ -236,6 +259,7 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
       await writeFile(conn, stackPath, updated);
     }
 
+    await ecrLoginIfNeeded(conn, imageLine);
     await exec(conn, `${dc} -f "${stackPath}" up -d --pull always --force-recreate "${serviceName}"`);
     if (note !== undefined) setNote(env, containerName, note);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-tag', oldTag, newTag, success: true, durationMs: Date.now() - startTime, noteSnapshot });
