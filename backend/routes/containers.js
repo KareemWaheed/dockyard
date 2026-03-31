@@ -26,7 +26,7 @@ async function ecrLoginIfNeeded(conn, image) {
   const envPrefix = cfg.accessKeyId && cfg.secretAccessKey
     ? `AWS_ACCESS_KEY_ID=${cfg.accessKeyId} AWS_SECRET_ACCESS_KEY=${cfg.secretAccessKey} AWS_DEFAULT_REGION=${region} `
     : '';
-  await exec(conn, `${envPrefix}aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${registry}`);
+  await exec(conn, `${envPrefix}aws ecr get-login-password --region ${region} | docker login -u AWS --password-stdin "https://${registry}"`);
 }
 
 function getServerConfig(server) {
