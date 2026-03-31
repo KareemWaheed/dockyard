@@ -10,23 +10,13 @@ const path = require('path').posix;
 
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
-const ECR_REGISTRY_RE = /^(\d+\.dkr\.ecr\.([\w-]+)\.amazonaws\.com)\//;
-
-function getAwsConfig() {
-  const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'awsSg'").get();
-  return row ? JSON.parse(row.value_json) : {};
-}
+const ECR_REGION_RE = /\.dkr\.ecr\.([\w-]+)\.amazonaws\.com\//;
 
 async function ecrLoginIfNeeded(conn, image) {
-  const m = ECR_REGISTRY_RE.exec(image);
+  const m = ECR_REGION_RE.exec(image);
   if (!m) return;
-  const registry = m[1];
-  const region = m[2];
-  const cfg = getAwsConfig();
-  const envPrefix = cfg.accessKeyId && cfg.secretAccessKey
-    ? `AWS_ACCESS_KEY_ID=${cfg.accessKeyId} AWS_SECRET_ACCESS_KEY=${cfg.secretAccessKey} AWS_DEFAULT_REGION=${region} `
-    : '';
-  await exec(conn, `${envPrefix}aws ecr get-login-password --region ${region} | docker login -u AWS --password-stdin "https://${registry}"`);
+  const region = m[1];
+  await exec(conn, `aws ecr get-login-password | docker login -u AWS --password-stdin "https://$(aws sts get-caller-identity --query 'Account' --output text).dkr.ecr.${region}.amazonaws.com"`);
 }
 
 function getServerConfig(server) {
