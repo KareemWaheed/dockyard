@@ -94,13 +94,16 @@ router.post('/:project', async (req, res) => {
   res.json({ runId, buildNumber, queued });
 });
 
-// GET /api/builds/:project/runs — list last 50 runs (no log)
+// GET /api/builds/:project/runs?offset=0&limit=20 — paginated list (no log)
 router.get('/:project/runs', (req, res) => {
   const { project } = req.params;
-  const runs = db.prepare(
-    'SELECT id, project, build_number, type, status, exit_code, branch, args_json, commits_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT 50'
-  ).all(project);
-  res.json(runs);
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  const offset = parseInt(req.query.offset) || 0;
+  const rows = db.prepare(
+    'SELECT id, project, build_number, type, status, exit_code, branch, args_json, commits_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT ? OFFSET ?'
+  ).all(project, limit + 1, offset);
+  const hasMore = rows.length > limit;
+  res.json({ runs: rows.slice(0, limit), hasMore });
 });
 
 // GET /api/builds/:project/runs/:num — single run with full log

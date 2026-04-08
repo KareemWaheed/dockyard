@@ -43,6 +43,11 @@ function isFormValid(params, formValues, branch) {
   }
   return true;
 }
+function formatRunDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 function statusColor(status) {
   if (status === 'success') return 'var(--green)';
   if (status === 'failed') return 'var(--red)';
@@ -91,6 +96,8 @@ export default function BuildView() {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [needsClone, setNeedsClone] = useState(false);
   const [runs, setRuns] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [liveLog, setLiveLog] = useState('');
   const [liveStatus, setLiveStatus] = useState(null);
@@ -162,15 +169,19 @@ export default function BuildView() {
       .finally(() => setLoadingBranches(false));
 
     fetchBuildRuns(activeProject)
-      .then(r => {
+      .then(({ runs: r, hasMore: more }) => {
         setRuns(r);
+        setHasMore(more);
         if (r.length > 0) openRun(r[0]);
       })
       .catch(() => {});
   }, [activeProject]);
 
   useEffect(() => {
-    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    if (outputRef.current) {
+      const el = outputRef.current;
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    }
   }, [liveLog]);
 
   useEffect(() => () => { wsRef.current?.close(); }, []);
@@ -183,7 +194,7 @@ export default function BuildView() {
   const setField = (key, value) => setFormStates(prev => ({
     ...prev, [activeProject]: { ...prev[activeProject], [key]: value },
   }));
-  const setBranch = (value) => setBranchStates(prev => ({ ...prev, [activeProject]: value }));
+  const setBranch = (value) => setBranchStates(prev => ({ ...prev, [activeProject]: typeof value === 'string' ? value.trim() : value }));
 
   const isRunning = runs.some(r => r.status === 'running');
   const canBuild = !needsClone && isFormValid(params, form, branch);
@@ -235,6 +246,16 @@ export default function BuildView() {
       setRuns(prev => [run, ...prev]);
       openRun(run);
     } catch (err) { console.error(err); }
+  };
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const { runs: more, hasMore: moreLeft } = await fetchBuildRuns(activeProject, { offset: runs.length });
+      setRuns(prev => [...prev, ...more]);
+      setHasMore(moreLeft);
+    } catch (err) { console.error(err); }
+    finally { setLoadingMore(false); }
   };
 
   const handleCancel = async () => {
@@ -330,27 +351,42 @@ export default function BuildView() {
                       padding: '5px 8px',
                       cursor: 'pointer',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
                       textAlign: 'left',
                       width: '100%',
+                      gap: 2,
                     }}
                   >
-                    <span style={{ color: 'var(--text)', fontSize: 12 }}>
-                      #{run.build_number} {run.type === 'clone' ? 'clone' : run.branch || ''}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: statusColor(run.status), fontSize: 11 }}>
-                        {statusLabel(run.status)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text)', fontSize: 12 }}>
+                        #{run.build_number} {run.type === 'clone' ? 'clone' : run.branch || ''}
                       </span>
-                      {queuePos !== null && (
-                        <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>pos {queuePos}</span>
-                      )}
-                    </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ color: statusColor(run.status), fontSize: 11 }}>
+                          {statusLabel(run.status)}
+                        </span>
+                        {queuePos !== null && (
+                          <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>pos {queuePos}</span>
+                        )}
+                      </span>
+                    </div>
+                    {run.started_at && (
+                      <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{formatRunDate(run.started_at)}</span>
+                    )}
                   </button>
                 );
               })}
             </div>
+            {hasMore && (
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                style={{ marginTop: 6, width: '100%', background: 'transparent', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 0', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -358,7 +394,12 @@ export default function BuildView() {
       {/* Col 3: Log output */}
       <div className="build-output">
         <div className="build-output-header">
-          <span>{selectedRun ? `#${selectedRun.build_number} — ${selectedRun.type}` : 'Output'}</span>
+          <span>
+            {selectedRun ? `#${selectedRun.build_number} — ${selectedRun.type}` : 'Output'}
+            {selectedRun?.started_at && (
+              <span style={{ color: 'var(--text-dim)', fontSize: 10, marginLeft: 8 }}>{formatRunDate(selectedRun.started_at)}</span>
+            )}
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isSelectedActive && (
               <>
@@ -433,7 +474,7 @@ function ParamField({ param, value, onChange }) {
   if (type === 'string') return (
     <div className="form-field">
       <label className="form-label">{labelText}</label>
-      <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder || ''} style={{ width: '100%' }} />
+      <input value={value || ''} onChange={e => onChange(e.target.value)} onBlur={e => onChange(e.target.value.trim())} placeholder={placeholder || ''} style={{ width: '100%' }} />
     </div>
   );
   if (type === 'select') return (

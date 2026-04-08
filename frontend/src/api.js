@@ -60,9 +60,9 @@ export async function startBuild(project, branch, args) {
   return r.json();
 }
 
-// List runs for a project (no log content)
-export async function fetchBuildRuns(project) {
-  const r = await fetch(`${BASE}/builds/${project}/runs`);
+// List runs for a project (no log content) — returns { runs, hasMore }
+export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
+  const r = await fetch(`${BASE}/builds/${project}/runs?offset=${offset}&limit=${limit}`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
