@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const { disconnect } = require('../services/ssh');
+const { exportConfig, importConfig } = require('../services/backup');
 
 // ─── Servers ────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,21 @@ router.put('/config/:key', (req, res) => {
   db.prepare('INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)')
     .run(req.params.key, JSON.stringify(req.body));
   res.json({ ok: true });
+});
+
+// ─── Export / Import ─────────────────────────────────────────────────────────
+
+router.get('/export', (req, res) => {
+  res.json(exportConfig(db));
+});
+
+router.post('/import', (req, res) => {
+  try {
+    importConfig(db, req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 module.exports = router;
