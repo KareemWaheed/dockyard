@@ -3,6 +3,7 @@ const db = require('../db');
 const { connect } = require('../services/ssh');
 const { subscribeRun } = require('../services/build-manager');
 const { subscribeRun: subscribeFlywayRun } = require('../services/flyway-manager');
+const { decryptField } = require('../encryption');
 
 module.exports = function attachLogs(httpServer) {
   // Single WSS instance — ws@8.x aborts the socket if a path-filtered WSS
@@ -48,10 +49,10 @@ module.exports = function attachLogs(httpServer) {
       host: server.host,
       ssh: {
         username: server.ssh_username,
-        password: server.ssh_password || undefined,
+        password: decryptField(server.ssh_password) || undefined,
         privateKeyPath: server.ssh_key_path || undefined,
-        privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-        passphrase: server.ssh_passphrase || undefined,
+        privateKey: server.ssh_key_content ? Buffer.from(decryptField(server.ssh_key_content), 'base64') : undefined,
+        passphrase: decryptField(server.ssh_passphrase) || undefined,
       },
     };
 

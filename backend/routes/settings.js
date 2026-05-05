@@ -2,6 +2,9 @@ const router = require('express').Router();
 const db = require('../db');
 const { disconnect } = require('../services/ssh');
 const { exportConfig, importConfig } = require('../services/backup');
+const { encrypt, decryptField } = require('../encryption');
+
+const SENSITIVE_FIELDS = ['ssh_password', 'ssh_key_content', 'ssh_passphrase']; 
 
 // ─── Servers ────────────────────────────────────────────────────────────────
 
@@ -10,6 +13,9 @@ router.get('/servers', (req, res) => {
   const stacks = db.prepare('SELECT * FROM compose_stacks').all();
   const result = servers.map(s => ({
     ...s,
+    ssh_password: decryptField(s.ssh_password),
+    ssh_key_content: decryptField(s.ssh_key_content),
+    ssh_passphrase: decryptField(s.ssh_passphrase),
     stacks: stacks.filter(st => st.server_id === s.id),
   }));
   res.json(result);
@@ -23,8 +29,8 @@ router.post('/servers', (req, res) => {
                          ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(env_key, name, host, ssh_username,
-         ssh_password ?? null, ssh_key_path ?? null,
-         ssh_key_content ?? null, ssh_passphrase ?? null,
+         encrypt(ssh_password ?? null), ssh_key_path ?? null,
+         encrypt(ssh_key_content ?? null), encrypt(ssh_passphrase ?? null),
          docker_compose_cmd ?? 'docker compose', aws_sg_id ?? null);
   const serverId = info.lastInsertRowid;
   for (const stack of (stacks || [])) {
@@ -42,8 +48,8 @@ router.put('/servers/:id', (req, res) => {
     UPDATE servers SET name=?, host=?, ssh_username=?, ssh_password=?, ssh_key_path=?,
       ssh_key_content=?, ssh_passphrase=?, docker_compose_cmd=?, aws_sg_id=? WHERE id=?
   `).run(name, host, ssh_username,
-         ssh_password ?? null, ssh_key_path ?? null,
-         ssh_key_content ?? null, ssh_passphrase ?? null,
+         encrypt(ssh_password ?? null), ssh_key_path ?? null,
+         encrypt(ssh_key_content ?? null), encrypt(ssh_passphrase ?? null),
          docker_compose_cmd ?? 'docker compose', aws_sg_id ?? null, id);
   // Replace stacks
   if (stacks !== undefined) {

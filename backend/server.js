@@ -8,7 +8,11 @@ const { hydrateQueue } = require('./services/build-manager');
 hydrateQueue();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+}));
 app.use(express.json());
 
 // Routes

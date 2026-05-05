@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Set encryption key before loading anything
+process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+
 // Use a temp config and temp db for the test
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'namaa-db-test-'));
 const tmpConfig = path.join(tmpDir, 'config.json');
@@ -43,19 +46,20 @@ process.env.DB_PATH = tmpDb;
 process.env.CONFIG_PATH = tmpConfig;
 
 const db = require('./db');
+const { decryptField } = require('./encryption');
 
 // Servers migrated
 const servers = db.prepare('SELECT * FROM servers ORDER BY env_key').all();
 assert(servers.length === 2, 'should have 2 servers');
 const dev = servers.find(s => s.env_key === 'dev');
 assert(dev.host === '10.0.0.1', 'dev host');
-assert(dev.ssh_password === 'secret', 'dev password');
+assert(decryptField(dev.ssh_password) === 'secret', 'dev password');
 assert(dev.ssh_key_path === null, 'dev key_path null');
 assert(dev.ssh_username === 'ec2-user', 'dev ssh_username');
 assert(dev.docker_compose_cmd === 'docker compose', 'dev docker_compose_cmd');
 const prod = servers.find(s => s.env_key === 'prod');
 assert(prod.ssh_key_path === '/home/user/.ssh/id_rsa', 'prod key path');
-assert(prod.ssh_passphrase === 'pp', 'prod passphrase');
+assert(decryptField(prod.ssh_passphrase) === 'pp', 'prod passphrase');
 
 // Stacks migrated
 const stacks = db.prepare('SELECT * FROM compose_stacks').all();

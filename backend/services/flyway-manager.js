@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const db = require('../db');
 const { checkoutAndPull, repoDir } = require('./git');
+const { decryptField } = require('../encryption');
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
@@ -44,6 +45,9 @@ function startFlywayRun(envId, dbId, project, branch, command) {
   const dbCfg = db.prepare('SELECT * FROM flyway_databases WHERE id = ?').get(dbId);
   if (!env || !dbCfg) throw new Error('Environment or database not found');
 
+  // Decrypt password for Maven command
+  const dbPassword = decryptField(dbCfg.db_password);
+
   const projects = getProjects();
   const proj = projects[project];
   if (!proj || !proj.isFlyway) throw new Error(`Project '${project}' is not a flyway project`);
@@ -74,7 +78,7 @@ function startFlywayRun(envId, dbId, project, branch, command) {
   const mvnArgs = [
     `-Dflyway.url=${dbCfg.url}`,
     `-Dflyway.user=${dbCfg.db_user}`,
-    `-Dflyway.password=${dbCfg.db_password}`,
+    `-Dflyway.password=${dbPassword}`,
     `-Dflyway.schemas=${dbCfg.schemas}`,
     `-Dflyway.locations=${dbCfg.locations}`,
     `-Dflyway.baselineOnMigrate=${dbCfg.baseline_on_migrate ? 'true' : 'false'}`,

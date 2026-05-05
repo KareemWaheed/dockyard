@@ -2,6 +2,7 @@
 const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
+const { encrypt } = require('./encryption');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'dashboard.db');
 const DATA_DIR = path.dirname(DB_PATH);
@@ -165,9 +166,9 @@ function migrateConfig(cfg) {
         name: server.name || envKey,
         host: server.host || '',
         ssh_username: server.ssh?.username || '',
-        ssh_password: server.ssh?.password || null,
+        ssh_password: encrypt(server.ssh?.password || null),
         ssh_key_path: server.ssh?.privateKeyPath || null,
-        ssh_passphrase: server.ssh?.passphrase || null,
+        ssh_passphrase: encrypt(server.ssh?.passphrase || null),
         docker_compose_cmd: server.dockerCompose || 'docker compose',
       });
       for (const stack of (server.composeStacks || [])) {

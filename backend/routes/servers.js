@@ -3,6 +3,7 @@ const db = require('../db');
 const { connect, exec } = require('../services/ssh');
 const { parseComposePs, parseBatchInspect } = require('../services/docker');
 const { getNote } = require('../notes');
+const { decryptField } = require('../encryption');
 
 router.get('/:env/containers', async (req, res) => {
   const { env } = req.params;
@@ -12,14 +13,18 @@ router.get('/:env/containers', async (req, res) => {
   const stacks = db.prepare('SELECT * FROM compose_stacks WHERE server_id = ?').all(server.id);
 
   // Build serverCfg in the shape ssh.js / connect() expects
+  const sshPassword = decryptField(server.ssh_password);
+  const sshKeyContent = decryptField(server.ssh_key_content);
+  const sshPassphrase = decryptField(server.ssh_passphrase);
+
   const serverCfg = {
     host: server.host,
     ssh: {
       username: server.ssh_username,
-      password: server.ssh_password || undefined,
+      password: sshPassword || undefined,
       privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
+      privateKey: sshKeyContent ? Buffer.from(sshKeyContent, 'base64') : undefined,
+      passphrase: sshPassphrase || undefined,
     },
   };
   const dc = server.docker_compose_cmd || 'docker compose';

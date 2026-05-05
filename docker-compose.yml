@@ -3,12 +3,13 @@ services:
     image: kareemwaheed/dockyard:latest
     restart: unless-stopped
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       # Minutes of silence before a build is flagged as possibly stuck (default: 15)
       # BUILD_STUCK_ALERT_MINUTES: 15
       # Minutes of silence before a build is auto-cancelled (default: 30)
       # BUILD_STUCK_CANCEL_MINUTES: 30
     ports:
-      - "3000:80"
+      - "127.0.0.1:80:80"
     volumes:
       - ./secret-keys:/app/secret-keys:ro
       # Mount your custom build scripts (optional, for the Build feature):

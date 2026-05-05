@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const { startFlywayRun, cancelRun } = require('../services/flyway-manager');
+const { encrypt, decryptField } = require('../encryption');
 
 // ── Environments ──────────────────────────────────────────────────────────────
 
@@ -11,7 +12,10 @@ router.get('/envs', (req, res) => {
   const databases = db.prepare('SELECT * FROM flyway_databases ORDER BY name').all();
   res.json(envs.map(e => ({
     ...e,
-    databases: databases.filter(d => d.env_id === e.id),
+    databases: databases.filter(d => d.env_id === e.id).map(d => ({
+      ...d,
+      db_password: decryptField(d.db_password),
+    })),
   })));
 });
 
@@ -52,7 +56,7 @@ router.post('/envs/:envId/databases', (req, res) => {
   const info = db.prepare(
     'INSERT INTO flyway_databases (env_id, name, url, db_user, db_password, schemas, locations, baseline_on_migrate, baseline_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
-    envId, name, url, db_user, db_password, schemas,
+    envId, name, url, db_user, encrypt(db_password), schemas,
     locations || 'filesystem:src/main/resources/db/migration/',
     baseline_on_migrate !== false ? 1 : 0,
     baseline_version || '1'
@@ -70,7 +74,7 @@ router.put('/databases/:id', (req, res) => {
   if (db_password) {
     db.prepare(
       'UPDATE flyway_databases SET name=?, url=?, db_user=?, db_password=?, schemas=?, locations=?, baseline_on_migrate=?, baseline_version=? WHERE id=?'
-    ).run(name, url, db_user, db_password, schemas,
+    ).run(name, url, db_user, encrypt(db_password), schemas,
       locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate !== false ? 1 : 0,
       baseline_version || '1',

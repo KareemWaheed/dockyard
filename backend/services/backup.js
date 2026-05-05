@@ -1,4 +1,5 @@
 // backend/services/backup.js
+const { encrypt, decryptField } = require('../encryption');
 
 function exportConfig(db) {
   const servers = db.prepare('SELECT * FROM servers').all();
@@ -18,6 +19,9 @@ function exportConfig(db) {
     exported_at: new Date().toISOString(),
     servers: servers.map(({ id, ...s }) => ({
       ...s,
+      ssh_password: decryptField(s.ssh_password),
+      ssh_key_content: decryptField(s.ssh_key_content),
+      ssh_passphrase: decryptField(s.ssh_passphrase),
       stacks: stacks
         .filter(st => st.server_id === id)
         .map(({ id: _id, server_id: _sid, ...st }) => st),
@@ -28,7 +32,10 @@ function exportConfig(db) {
       ...e,
       databases: flywayDbs
         .filter(d => d.env_id === id)
-        .map(({ id: _id, env_id: _eid, ...d }) => d),
+        .map(({ id: _id, env_id: _eid, ...d }) => ({
+          ...d,
+          db_password: decryptField(d.db_password),
+        })),
     })),
   };
 }
@@ -59,6 +66,9 @@ function importConfig(db, payload) {
         ssh_password: null, ssh_key_path: null, ssh_key_content: null,
         ssh_passphrase: null, docker_compose_cmd: 'docker compose', aws_sg_id: null,
         ...row,
+        ssh_password: encrypt(row.ssh_password || null),
+        ssh_key_content: encrypt(row.ssh_key_content || null),
+        ssh_passphrase: encrypt(row.ssh_passphrase || null),
       });
       for (const st of (stacks || [])) {
         db.prepare('INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)')
@@ -85,7 +95,7 @@ function importConfig(db, payload) {
           INSERT INTO flyway_databases
             (env_id, name, url, db_user, db_password, schemas, locations, baseline_on_migrate, baseline_version)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(eid, d.name, d.url, d.db_user, d.db_password, d.schemas,
+        `).run(eid, d.name, d.url, d.db_user, encrypt(d.db_password), d.schemas,
                d.locations, d.baseline_on_migrate, d.baseline_version);
       }
     }

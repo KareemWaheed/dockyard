@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
 const { appendService } = require('../services/compose');
+const { decryptField } = require('../encryption');
 
 // POST /api/services/:env/:stackIdx
 // body: { name, image, ports, environment, restart }
@@ -18,10 +19,10 @@ router.post('/:env/:stackIdx', async (req, res) => {
     host: server.host,
     ssh: {
       username: server.ssh_username,
-      password: server.ssh_password || undefined,
+      password: decryptField(server.ssh_password) || undefined,
       privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
+      privateKey: server.ssh_key_content ? Buffer.from(decryptField(server.ssh_key_content), 'base64') : undefined,
+      passphrase: decryptField(server.ssh_passphrase) || undefined,
     },
   };
 
