@@ -41,9 +41,13 @@ function updateImageInCompose(composeContent, serviceName, newTag) {
 }
 
 function updateEnvVar(envContent, varName, newValue) {
-  const vars = parseEnvFile(envContent);
-  vars[varName] = newValue;
-  return stringifyEnvFile(vars);
+  const re = new RegExp(`^(${varName}=).*$`, 'm');
+  if (re.test(envContent)) {
+    return envContent.replace(re, `$1${newValue}`);
+  }
+  // Variable not present — append it
+  const trailing = envContent.endsWith('\n') ? '' : '\n';
+  return envContent + trailing + `${varName}=${newValue}\n`;
 }
 
 function addEnvVarToCompose(composeContent, serviceName, key, value) {

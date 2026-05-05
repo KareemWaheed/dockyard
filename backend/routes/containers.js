@@ -10,15 +10,6 @@ const path = require('path').posix;
 
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
-const ECR_REGION_RE = /\.dkr\.ecr\.([\w-]+)\.amazonaws\.com\//;
-
-async function ecrLoginIfNeeded(conn, image) {
-  const m = ECR_REGION_RE.exec(image);
-  if (!m) return;
-  const region = m[1];
-  await exec(conn, `aws ecr get-login-password | docker login -u AWS --password-stdin "https://$(aws sts get-caller-identity --query 'Account' --output text).dkr.ecr.${region}.amazonaws.com"`);
-}
-
 function getServerConfig(server) {
   return {
     host: server.host,
@@ -155,10 +146,6 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    const composeContentForEcr = await readFile(conn, stackPath).catch(() => '');
-    const composeDocForEcr = require('js-yaml').load(composeContentForEcr);
-    const imageForEcr = composeDocForEcr?.services?.[serviceName]?.image || '';
-    await ecrLoginIfNeeded(conn, imageForEcr);
     await exec(conn, `${dc} -f "${stackPath}" pull "${serviceName}"`);
     await exec(conn, `${dc} -f "${stackPath}" up -d --force-recreate "${serviceName}"`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'pull-recreate', success: true, durationMs: Date.now() - startTime, noteSnapshot });
@@ -240,16 +227,15 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
       const varName = extractVarName(imageLine);
       const envPath = path.join(path.dirname(stackPath), '.env');
       const envContent = await readFile(conn, envPath).catch(() => '');
-      oldTag = (envContent.match(new RegExp(`^${varName}=(.+)$`, 'm')) || [])[1] ?? null;
+      oldTag = (envContent.match(new RegExp(`^${varName}=(.+)$`, 'm')) || [])[1]?.trimEnd() ?? null;
       const updated = updateEnvVar(envContent, varName, newTag);
       await writeFile(conn, envPath, updated);
     } else {
-      oldTag = imageLine.split(':')[1] ?? null;
+      const colonIdx = imageLine.lastIndexOf(':');
+      oldTag = colonIdx !== -1 ? imageLine.slice(colonIdx + 1) : null;
       const updated = updateImageInCompose(composeContent, serviceName, newTag);
       await writeFile(conn, stackPath, updated);
     }
-
-    await ecrLoginIfNeeded(conn, imageLine);
     await exec(conn, `${dc} -f "${stackPath}" up -d --pull always --force-recreate "${serviceName}"`);
     if (note !== undefined) setNote(env, containerName, note);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-tag', oldTag, newTag, success: true, durationMs: Date.now() - startTime, noteSnapshot });
