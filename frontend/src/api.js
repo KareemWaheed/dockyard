@@ -216,6 +216,22 @@ export async function updateAppConfig(key, body) {
   return r.json();
 }
 
+export async function exportSettings() {
+  const r = await fetch(`${BASE}/settings/export`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function importSettings(payload) {
+  const r = await fetch(`${BASE}/settings/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 // ─── Flyway ───────────────────────────────────────────────────────────────────
 
 export async function fetchFlywayEnvs() {
