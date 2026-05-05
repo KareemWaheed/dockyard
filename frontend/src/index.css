@@ -927,6 +927,11 @@ input:focus, select:focus, textarea:focus {
 .settings-tab-btn { padding: 6px 14px; border: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; border-radius: 4px; font-size: 13px; }
 .settings-tab-btn.active { background: var(--blue); color: #1a1b26; border-color: var(--blue); }
 .settings-tab-content { max-width: 800px; }
+.backup-restore-section { max-width: 800px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border); }
+.backup-restore-section h3 { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+.backup-restore-section p { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+.backup-restore-actions { display: flex; gap: 10px; }
+.backup-restore-error { margin-top: 10px; font-size: 13px; color: var(--red); }
 .settings-tab { display: flex; flex-direction: column; gap: 12px; }
 .settings-tab h3 { margin: 0 0 4px; font-size: 15px; }
 .settings-tab-header { display: flex; justify-content: space-between; align-items: center; }
