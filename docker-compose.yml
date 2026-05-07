@@ -2,6 +2,8 @@ services:
   dockyard:
     image: kareemwaheed/dockyard:latest
     restart: unless-stopped
+    privileged: true
+    pid: host
     environment:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       # Minutes of silence before a build is flagged as possibly stuck (default: 15)
