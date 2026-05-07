@@ -81,6 +81,18 @@ export async function replayBuildRun(project, buildNumber) {
   return r.json();
 }
 
+// Streams VPN restart output (runs locally on the backend machine)
+export async function restartVpn(onChunk, onDone) {
+  const r = await fetch(`${BASE}/servers/restart-vpn`, { method: 'POST' });
+  if (!r.ok) {
+    const err = await r.text();
+    onChunk(`ERROR: ${err}\n`);
+    onDone(1);
+    return;
+  }
+  await streamWithSentinel(r, onChunk, onDone);
+}
+
 // Streams whitelist output
 export async function whitelistIp(env, onChunk, onDone) {
   const r = await fetch(`${BASE}/awssg/whitelist`, {

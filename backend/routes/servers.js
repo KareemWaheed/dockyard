@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { spawn } = require('child_process');
 const db = require('../db');
 const { connect, exec } = require('../services/ssh');
 const { parseComposePs, parseBatchInspect } = require('../services/docker');
@@ -101,6 +102,22 @@ router.get('/:env/containers', async (req, res) => {
   } catch (err) {
     res.status(503).json({ error: err.message });
   }
+});
+
+// POST /api/servers/restart-vpn
+// Runs daemon-reload + restart fortivpn locally on the backend machine, streams output
+router.post('/restart-vpn', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  const proc = spawn('bash', ['-c', 'sudo systemctl daemon-reload && sudo systemctl restart fortivpn']);
+
+  proc.stdout.on('data', (d) => res.write(d));
+  proc.stderr.on('data', (d) => res.write(d));
+  proc.on('close', (code) => {
+    res.write(`\n__EXIT_CODE__${code}`);
+    res.end();
+  });
 });
 
 module.exports = router;

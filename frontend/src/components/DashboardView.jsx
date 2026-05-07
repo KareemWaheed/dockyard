@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { whitelistIp } from '../api';
+import { whitelistIp, restartVpn } from '../api';
 import StackGroup from './StackGroup';
 import ContainerRow from './ContainerRow';
 import BulkActionBar from './BulkActionBar';
@@ -27,7 +27,12 @@ export default function DashboardView({ env, stacks, standalone, fetchError, las
     <>
       <div className="dashboard-statusbar">
         {!stacks && !fetchError && <span style={{ color: 'var(--text-dim)' }}>Connecting…</span>}
-        {fetchError && <span style={{ color: 'var(--red)', fontSize: 11 }}>⚠ {errorHint}</span>}
+        {fetchError && (
+          <>
+            <span style={{ color: 'var(--red)', fontSize: 11 }}>⚠ {errorHint}</span>
+            {!isAwsEnv && <RestartVpnButton onSuccess={onRefresh} />}
+          </>
+        )}
         {stacks && !fetchError && (
           <>
             <span style={{ color: 'var(--green)', fontSize: 11 }}>● Connected</span>
@@ -87,6 +92,38 @@ export default function DashboardView({ env, stacks, standalone, fetchError, las
           </div>
         )}
       </div>
+    </>
+  );
+}
+
+function RestartVpnButton({ onSuccess }) {
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState('');
+  const [show, setShow] = useState(false);
+
+  const run = async () => {
+    setRunning(true); setOutput(''); setShow(true);
+    await restartVpn((chunk) => setOutput(o => o + chunk), (code) => {
+      setRunning(false);
+      if (code === 0) setTimeout(onSuccess, 2000);
+    });
+  };
+
+  return (
+    <>
+      <button onClick={run} disabled={running} className="btn" style={{ color: 'var(--yellow)', fontSize: 10 }}>
+        {running ? 'Restarting…' : '>> Restart FortiVPN'}
+      </button>
+      {show && (
+        <div className="modal-backdrop" onClick={() => { if (!running) setShow(false); }}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <pre style={{ overflow: 'auto', maxHeight: '50vh', color: 'var(--green)', fontSize: 11 }}>{output || ' '}</pre>
+            <button onClick={() => setShow(false)} disabled={running} className="btn" style={{ marginTop: 10 }}>
+              {running ? 'Running…' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
