@@ -110,7 +110,7 @@ router.post('/restart-vpn', (req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  const proc = spawn('bash', ['-c', 'sudo systemctl daemon-reload && sudo systemctl restart fortivpn']);
+  const proc = spawn('bash', ['-c', 'systemctl daemon-reload && systemctl restart fortivpn']);
 
   proc.stdout.on('data', (d) => res.write(d));
   proc.stderr.on('data', (d) => res.write(d));
