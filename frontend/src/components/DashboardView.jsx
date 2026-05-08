@@ -27,12 +27,8 @@ export default function DashboardView({ env, stacks, standalone, fetchError, las
     <>
       <div className="dashboard-statusbar">
         {!stacks && !fetchError && <span style={{ color: 'var(--text-dim)' }}>Connecting…</span>}
-        {fetchError && (
-          <>
-            <span style={{ color: 'var(--red)', fontSize: 11 }}>⚠ {errorHint}</span>
-            {!isAwsEnv && <RestartVpnButton onSuccess={onRefresh} />}
-          </>
-        )}
+        {fetchError && <span style={{ color: 'var(--red)', fontSize: 11 }}>⚠ {errorHint}</span>}
+        {!isAwsEnv && !stacks && <RestartVpnButton onSuccess={onRefresh} />}
         {stacks && !fetchError && (
           <>
             <span style={{ color: 'var(--green)', fontSize: 11 }}>● Connected</span>
