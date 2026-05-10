@@ -59,7 +59,7 @@ router.post('/envs/:envId/databases', (req, res) => {
     envId, name, url, db_user, encrypt(db_password), schemas,
     locations || 'filesystem:src/main/resources/db/migration/',
     baseline_on_migrate !== false ? 1 : 0,
-    baseline_version || '1'
+    baseline_version || '2'
   );
   res.json({ id: info.lastInsertRowid });
 });
@@ -77,7 +77,7 @@ router.put('/databases/:id', (req, res) => {
     ).run(name, url, db_user, encrypt(db_password), schemas,
       locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate !== false ? 1 : 0,
-      baseline_version || '1',
+      baseline_version || '2',
       req.params.id);
   } else {
     db.prepare(
@@ -85,7 +85,7 @@ router.put('/databases/:id', (req, res) => {
     ).run(name, url, db_user, schemas,
       locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate !== false ? 1 : 0,
-      baseline_version || '1',
+      baseline_version || '2',
       req.params.id);
   }
   res.json({ ok: true });

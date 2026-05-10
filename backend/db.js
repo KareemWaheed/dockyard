@@ -104,7 +104,7 @@ db.exec(`
     schemas             TEXT NOT NULL,
     locations           TEXT NOT NULL DEFAULT 'filesystem:src/main/resources/db/migration/',
     baseline_on_migrate INTEGER NOT NULL DEFAULT 1,
-    baseline_version    TEXT NOT NULL DEFAULT '1'
+    baseline_version    TEXT NOT NULL DEFAULT '2'
   );
 
   CREATE TABLE IF NOT EXISTS flyway_runs (

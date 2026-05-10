@@ -83,6 +83,7 @@ function startFlywayRun(envId, dbId, project, branch, command) {
     `-Dflyway.locations=${dbCfg.locations}`,
     `-Dflyway.baselineOnMigrate=${dbCfg.baseline_on_migrate ? 'true' : 'false'}`,
     `-Dflyway.baselineVersion=${dbCfg.baseline_version}`,
+    `-Dflyway.outOfOrder=true`,
     `flyway:${command}`,
   ];
 
