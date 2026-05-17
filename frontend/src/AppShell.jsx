@@ -27,6 +27,7 @@ export function computeEnvStatuses(containersByEnv, fetchErrorByEnv) {
 export default function AppShell() {
   const [envs, setEnvs] = useState([]);
   const [awsSgEnvs, setAwsSgEnvs] = useState(new Set());
+  const [maintenanceEnvs, setMaintenanceEnvs] = useState(new Set());
   const [activeEnv, setActiveEnv] = useState(null);
   const [activeView, setActiveView] = useState('dashboard');
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -50,6 +51,7 @@ export default function AppShell() {
       const keys = servers.map(s => s.env_key);
       setEnvs(keys);
       setAwsSgEnvs(new Set(servers.filter(s => s.aws_sg_id).map(s => s.env_key)));
+      setMaintenanceEnvs(new Set(servers.filter(s => s.maintenance_flag_path).map(s => s.env_key)));
       setActiveEnv(k => k && keys.includes(k) ? k : keys[0] ?? null);
       setContainersByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? null])));
       setFetchErrorByEnv(prev => Object.fromEntries(keys.map(k => [k, prev[k] ?? false])));
@@ -132,6 +134,7 @@ export default function AppShell() {
             lastRefresh={lastRefreshByEnv[activeEnv]}
             onRefresh={() => handleRefresh(activeEnv)}
             hasAwsSg={awsSgEnvs.has(activeEnv)}
+            hasMaintenance={maintenanceEnvs.has(activeEnv)}
           />
         )}
         {activeView === 'build' && <BuildView />}

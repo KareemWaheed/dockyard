@@ -195,6 +195,7 @@ function migrateConfig(cfg) {
 
 // Add aws_sg_id column if not present (migration)
 try { db.exec('ALTER TABLE servers ADD COLUMN aws_sg_id TEXT'); } catch {}
+try { db.exec('ALTER TABLE servers ADD COLUMN maintenance_flag_path TEXT'); } catch {}
 
 // Ensure projects have params arrays (migration for pre-params configs)
 try {

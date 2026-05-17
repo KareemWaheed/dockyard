@@ -5,6 +5,7 @@ const EMPTY_FORM = {
   env_key: '', name: '', host: '', ssh_username: '',
   auth_method: 'password', ssh_password: '', ssh_key_path: '', ssh_key_content: '',
   ssh_passphrase: '', docker_compose_cmd: 'docker compose', aws_sg_id: '',
+  maintenance_flag_path: '',
   stacks: [{ name: '', path: '' }],
 };
 
@@ -26,6 +27,7 @@ export default function ServersTab() {
       ssh_password: s.ssh_password || '', ssh_key_path: s.ssh_key_path || '',
       ssh_key_content: s.ssh_key_content || '', ssh_passphrase: s.ssh_passphrase || '',
       docker_compose_cmd: s.docker_compose_cmd || 'docker compose', aws_sg_id: s.aws_sg_id || '',
+      maintenance_flag_path: s.maintenance_flag_path || '',
       stacks: s.stacks.length ? s.stacks.map(st => ({ name: st.name, path: st.path })) : [{ name: '', path: '' }],
     });
   };
@@ -40,6 +42,7 @@ export default function ServersTab() {
       ssh_passphrase: form.auth_method !== 'password' ? form.ssh_passphrase : null,
       docker_compose_cmd: form.docker_compose_cmd,
       aws_sg_id: form.aws_sg_id || null,
+      maintenance_flag_path: form.maintenance_flag_path || null,
       stacks: form.stacks.filter(s => s.name && s.path),
     };
     if (editId) await updateSettingsServer(editId, body);
@@ -128,6 +131,7 @@ export default function ServersTab() {
             )}
             <label>Docker Compose Command <input value={form.docker_compose_cmd} onChange={e => setField('docker_compose_cmd', e.target.value)} /></label>
             <label>AWS Security Group ID <input placeholder="sg-xxxxxxxxxxxxxxxxx (optional)" value={form.aws_sg_id} onChange={e => setField('aws_sg_id', e.target.value)} /></label>
+            <label>Maintenance Flag Path <input placeholder="/path/to/nginx/maintenance.flag (optional)" value={form.maintenance_flag_path} onChange={e => setField('maintenance_flag_path', e.target.value)} /></label>
             <div className="settings-stacks-editor">
               <div className="settings-stacks-header">
                 <span>Compose Stacks</span>

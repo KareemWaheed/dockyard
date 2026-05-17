@@ -139,6 +139,24 @@ async function streamWithSentinel(r, onChunk, onDone) {
   }
 }
 
+// ─── Maintenance ─────────────────────────────────────────────────────────────
+
+export async function getMaintenance(env) {
+  const r = await fetch(`${BASE}/maintenance/${env}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function setMaintenance(env, enabled) {
+  const r = await fetch(`${BASE}/maintenance/${env}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 // ─── History ─────────────────────────────────────────────────────────────────
 
 export async function fetchHistory(env, { container, limit = 100, offset = 0 } = {}) {

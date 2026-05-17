@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { whitelistIp, restartVpn } from '../api';
+import React, { useState, useEffect } from 'react';
+import { whitelistIp, restartVpn, getMaintenance, setMaintenance } from '../api';
 import StackGroup from './StackGroup';
 import ContainerRow from './ContainerRow';
 import BulkActionBar from './BulkActionBar';
 
-export default function DashboardView({ env, stacks, standalone, fetchError, lastRefresh, onRefresh, hasAwsSg }) {
+export default function DashboardView({ env, stacks, standalone, fetchError, lastRefresh, onRefresh, hasAwsSg, hasMaintenance }) {
   const [selected, setSelected] = useState(new Set());
 
   const isAwsEnv = hasAwsSg;
@@ -39,6 +39,7 @@ export default function DashboardView({ env, stacks, standalone, fetchError, las
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {isAwsEnv && <WhitelistButton env={env} onSuccess={onRefresh} />}
+          {hasMaintenance && <MaintenanceButton env={env} />}
         </div>
       </div>
 
@@ -121,6 +122,50 @@ function RestartVpnButton({ onSuccess }) {
         </div>
       )}
     </>
+  );
+}
+
+function MaintenanceButton({ env }) {
+  const [enabled, setEnabled] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    getMaintenance(env).then(d => setEnabled(d.enabled)).catch(() => {});
+  }, [env]);
+
+  const toggle = async () => {
+    const next = !enabled;
+    const label = next ? 'Enable' : 'Disable';
+    if (!window.confirm(`${label} maintenance mode for ${env}?`)) return;
+    setBusy(true); setError(null);
+    try {
+      await setMaintenance(env, next);
+      setEnabled(next);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (enabled === null) return null;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {error && <span style={{ color: 'var(--red)', fontSize: 10 }}>{error}</span>}
+      <button
+        onClick={toggle}
+        disabled={busy}
+        className="btn"
+        style={{ color: enabled ? 'var(--red)' : 'var(--yellow)', fontSize: 10 }}
+      >
+        {busy ? '…' : enabled ? '>> Disable Maintenance' : '>> Enable Maintenance'}
+      </button>
+      {enabled && (
+        <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>MAINTENANCE ON</span>
+      )}
+    </div>
   );
 }
 

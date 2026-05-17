@@ -59,12 +59,15 @@ function importConfig(db, payload) {
       const { stacks, ...row } = s;
       const { lastInsertRowid: sid } = db.prepare(`
         INSERT INTO servers (env_key, name, host, ssh_username, ssh_password, ssh_key_path,
-                             ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id)
+                             ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id,
+                             maintenance_flag_path)
         VALUES (@env_key, @name, @host, @ssh_username, @ssh_password, @ssh_key_path,
-                @ssh_key_content, @ssh_passphrase, @docker_compose_cmd, @aws_sg_id)
+                @ssh_key_content, @ssh_passphrase, @docker_compose_cmd, @aws_sg_id,
+                @maintenance_flag_path)
       `).run({
         ssh_password: null, ssh_key_path: null, ssh_key_content: null,
         ssh_passphrase: null, docker_compose_cmd: 'docker compose', aws_sg_id: null,
+        maintenance_flag_path: null,
         ...row,
         ssh_password: encrypt(row.ssh_password || null),
         ssh_key_content: encrypt(row.ssh_key_content || null),
