@@ -1,4 +1,4 @@
-const { execSync, spawn } = require('child_process');
+const { execSync, execFileSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -6,6 +6,15 @@ const REPOS_DIR = path.join(__dirname, '..', '..', 'repos');
 
 function repoDir(projectKey) {
   return path.join(REPOS_DIR, projectKey);
+}
+
+// Branch is passed as an argv element (not shell-interpolated), so this only
+// needs to block leading '-' (arg injection) and whitespace/control chars —
+// not restrict to a narrow charset of "shell-safe" punctuation.
+function isSafeBranchName(branch) {
+  return typeof branch === 'string' && branch.length > 0
+    && !branch.startsWith('-')
+    && !/[\s\x00-\x1f]/.test(branch);
 }
 
 function buildAuthUrl(repoUrl, token) {
@@ -36,13 +45,15 @@ function listBranches(projectKey) {
 }
 
 function checkoutAndPull(projectKey, branch) {
-  if (!/^[\w.\-\/]+$/.test(branch)) throw new Error(`Invalid branch name: ${branch}`);
+  if (!isSafeBranchName(branch)) throw new Error(`Invalid branch name: ${branch}`);
   const dir = repoDir(projectKey);
   // Use -B to create/reset local branch tracking origin/<branch>, avoids detached HEAD.
   // Then fetch and pull to ensure the local branch is at the latest remote state.
-  execSync(`git checkout -B ${branch} origin/${branch}`, { cwd: dir, stdio: 'pipe' });
-  execSync(`git fetch origin ${branch} --prune`, { cwd: dir, stdio: 'pipe' });
-  execSync(`git pull --ff-only origin ${branch}`, { cwd: dir, stdio: 'pipe' });
+  // Args are passed as argv (not shell-interpolated) so branch names with
+  // punctuation like parens are safe here.
+  execFileSync('git', ['checkout', '-B', branch, `origin/${branch}`], { cwd: dir, stdio: 'pipe' });
+  execFileSync('git', ['fetch', 'origin', branch, '--prune'], { cwd: dir, stdio: 'pipe' });
+  execFileSync('git', ['pull', '--ff-only', 'origin', branch], { cwd: dir, stdio: 'pipe' });
 }
 
 function getRecentCommits(projectKey, n = 3) {
@@ -91,4 +102,4 @@ function spawnBuild(projectKey, scriptName, args, onData, onClose, env = {}) {
   return proc;
 }
 
-module.exports = { ensureCloned, listBranches, checkoutAndPull, getRecentCommits, spawnBuild, spawnClone, repoDir };
+module.exports = { ensureCloned, listBranches, checkoutAndPull, getRecentCommits, spawnBuild, spawnClone, repoDir, isSafeBranchName };

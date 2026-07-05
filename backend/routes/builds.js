@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
-const { ensureCloned, listBranches, repoDir } = require('../services/git');
+const { ensureCloned, listBranches, repoDir, isSafeBranchName } = require('../services/git');
 const { startBuildRun, startCloneRun, cancelRun } = require('../services/build-manager');
 const fs = require('fs');
 const path = require('path');
@@ -77,7 +77,7 @@ router.post('/:project', async (req, res) => {
   const { project } = req.params;
   const { branch, args = [] } = req.body;
 
-  if (!branch || !/^[\w.\-\/]+$/.test(branch)) {
+  if (!isSafeBranchName(branch)) {
     return res.status(400).json({ error: 'Invalid branch name' });
   }
   const proj = getProjects()[project];
