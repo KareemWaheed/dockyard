@@ -80,17 +80,17 @@ export default function HistoryView() {
                   onClick={() => !row.success && setExpandedId(expandedId === row.id ? null : row.id)}
                   style={{ cursor: row.success ? 'default' : 'pointer' }}
                 >
-                  <td title={row.timestamp}>{timeAgo(row.timestamp)}</td>
-                  <td>{row.env}</td>
-                  <td>{row.container_name}</td>
-                  <td>{row.action}</td>
-                  <td>
+                  <td data-label="Time" title={row.timestamp}>{timeAgo(row.timestamp)}</td>
+                  <td data-label="Env">{row.env}</td>
+                  <td data-label="Container">{row.container_name}</td>
+                  <td data-label="Action">{row.action}</td>
+                  <td data-label="Tag Change">
                     {row.old_tag && row.new_tag
                       ? `${row.old_tag} → ${row.new_tag}`
                       : '—'}
                   </td>
-                  <td>{row.success ? '✓' : '✗'}</td>
-                  <td>{row.duration_ms != null ? `${(row.duration_ms / 1000).toFixed(1)}s` : '—'}</td>
+                  <td data-label="Status">{row.success ? '✓' : '✗'}</td>
+                  <td data-label="Duration">{row.duration_ms != null ? `${(row.duration_ms / 1000).toFixed(1)}s` : '—'}</td>
                 </tr>
                 {expandedId === row.id && row.error_message && (
                   <tr className="history-row-error">

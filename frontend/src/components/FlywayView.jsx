@@ -277,16 +277,16 @@ export default function FlywayView() {
                   className={selectedRunId === run.id ? 'active' : ''}
                   onClick={() => openRun(run)}
                 >
-                  <td>{run.run_number}</td>
-                  <td>{run.project}</td>
-                  <td>{run.branch}</td>
-                  <td>{run.env_name || '—'}</td>
-                  <td>{run.db_name || '—'}</td>
-                  <td style={{ color: run.command === 'migrate' ? 'var(--orange, #f7825f)' : 'var(--blue)' }}>
+                  <td data-label="#">{run.run_number}</td>
+                  <td data-label="Project">{run.project}</td>
+                  <td data-label="Branch">{run.branch}</td>
+                  <td data-label="Env">{run.env_name || '—'}</td>
+                  <td data-label="Database">{run.db_name || '—'}</td>
+                  <td data-label="Command" style={{ color: run.command === 'migrate' ? 'var(--orange, #f7825f)' : 'var(--blue)' }}>
                     {run.command}
                   </td>
-                  <td style={{ color: statusColor(run.status) }}>{statusLabel(run.status)}</td>
-                  <td style={{ color: 'var(--text-dim)' }}>
+                  <td data-label="Status" style={{ color: statusColor(run.status) }}>{statusLabel(run.status)}</td>
+                  <td data-label="Started" style={{ color: 'var(--text-dim)' }}>
                     {run.started_at ? new Date(run.started_at.endsWith('Z') ? run.started_at : run.started_at + 'Z').toLocaleString() : ''}
                   </td>
                 </tr>

@@ -146,6 +146,8 @@ body {
 .status-dot.loading  { background: #334155; }
 .status-dot.unknown  { background: #334155; }
 
+.topbar-menu-btn { display: none; }
+
 /* ── Top bar ── */
 .topbar {
   height: 44px;
@@ -1254,3 +1256,125 @@ html[data-theme="light"] .modal-backdrop {
 .flyway-history-table tr:hover td { background: var(--surface-hover); cursor: pointer; }
 
 .flyway-history-table tr.active td { background: rgba(122,162,247,0.07); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile (phone) layout — ≤480px
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  body { font-size: 13px; }
+
+  /* Sidebar becomes an off-canvas drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 300;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-out;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 290;
+  }
+
+  .topbar-menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar-search span:not(:first-child) { display: none; }
+  .topbar-search { flex: 0 0 auto; max-width: none; padding: 5px 8px; }
+
+  /* Container rows become stacked cards */
+  .container-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+  .container-name, .container-image, .container-note {
+    width: 100%;
+    max-width: none;
+  }
+  .container-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .container-actions .btn-action {
+    flex: 1 1 calc(33% - 6px);
+    text-align: center;
+    border: 1px solid var(--border);
+    padding: 5px 4px;
+  }
+
+  /* Build view: stack into a single scrollable column */
+  .build-view { flex-direction: column; overflow-y: auto; }
+  .build-projects {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+  .build-projects .build-recent { display: none; }
+  .build-project-item { width: auto; white-space: nowrap; flex-shrink: 0; }
+  .build-form, .build-output {
+    width: 100%;
+    border-right: none;
+    flex: none;
+  }
+
+  /* Flyway controls: full-width stacked fields */
+  .flyway-view { padding: 12px 14px; }
+  .flyway-field { min-width: 0; width: 100%; }
+  .flyway-actions { flex-wrap: wrap; }
+
+  /* History & Flyway history tables → stacked cards */
+  .history-table, .history-table thead, .history-table tbody,
+  .flyway-history-table, .flyway-history-table thead, .flyway-history-table tbody {
+    display: block;
+  }
+  .history-table thead tr, .flyway-history-table thead tr { display: none; }
+  .history-table tr, .flyway-history-table tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    padding: 6px 0;
+  }
+  .history-table td, .flyway-history-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: none;
+    padding: 4px 10px;
+  }
+  .history-table td[data-label]::before, .flyway-history-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .history-row-error td { display: block; }
+  .history-search { width: 100%; }
+
+  /* Logs panel: full-screen sheet instead of side panel */
+  .logs-panel { width: 100%; }
+
+  /* Modals: full-width sheets */
+  .modal-box { min-width: 0; width: 92%; }
+  .settings-modal { width: 92%; }
+
+  /* Settings tabs: horizontal scroll instead of wrap */
+  .settings-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .settings-tab-btn { flex-shrink: 0; }
+
+  /* Command palette: fit short viewports */
+  .palette-backdrop { padding-top: 24px; }
+  .palette-box { width: 94vw; }
+}

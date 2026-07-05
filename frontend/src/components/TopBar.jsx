@@ -1,8 +1,11 @@
 import React from 'react';
 
-export default function TopBar({ onSearchClick, lastRefresh, onRefresh, theme, onToggleTheme }) {
+export default function TopBar({ onSearchClick, onMenuClick, lastRefresh, onRefresh, theme, onToggleTheme }) {
   return (
     <div className="topbar">
+      <button className="btn topbar-menu-btn" title="Menu" onClick={onMenuClick} style={{ fontSize: 13, padding: '3px 8px' }}>
+        ☰
+      </button>
       <div className="topbar-search" onClick={onSearchClick}>
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>⌘</span>
         <span>Search containers, stacks...</span>

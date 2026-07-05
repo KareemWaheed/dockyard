@@ -31,6 +31,7 @@ export default function AppShell() {
   const [activeEnv, setActiveEnv] = useState(null);
   const [activeView, setActiveView] = useState('dashboard');
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
 
   useEffect(() => {
@@ -103,23 +104,32 @@ export default function AppShell() {
   const handleEnvChange = (env) => {
     setActiveEnv(env);
     setActiveView('dashboard');
+    setSidebarOpen(false);
+  };
+
+  const handleViewChange = (view) => {
+    setActiveView(view);
+    setSidebarOpen(false);
   };
 
   const handleRefresh = useCallback((env) => loadEnvFull(env), [loadEnvFull]);
 
   return (
     <div className="app-shell">
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         envs={envs}
         activeEnv={activeEnv}
         activeView={activeView}
         onEnvChange={handleEnvChange}
-        onViewChange={setActiveView}
+        onViewChange={handleViewChange}
         envStatuses={envStatuses}
+        open={sidebarOpen}
       />
       <div className="app-main">
         <TopBar
           onSearchClick={() => setPaletteOpen(true)}
+          onMenuClick={() => setSidebarOpen(o => !o)}
           lastRefresh={lastRefreshByEnv[activeEnv]}
           onRefresh={() => handleRefresh(activeEnv)}
           theme={theme}

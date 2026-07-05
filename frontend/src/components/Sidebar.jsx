@@ -1,12 +1,12 @@
 import React from 'react';
 
-export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChange, envStatuses, envs }) {
+export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChange, envStatuses, envs, open }) {
 
   const totalConnected = Object.values(envStatuses).filter(s => s !== 'loading' && s !== 'unknown').length;
   const allHealthy = Object.values(envStatuses).every(s => s === 'healthy');
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="sidebar-logo">
         <div className="sidebar-logo-name">DOCKYARD</div>
         <div className="sidebar-logo-sub">DEVOPS</div>
