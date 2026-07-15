@@ -18,16 +18,16 @@ So I built Dockyard: a thin dashboard that sits on top of your existing SSH acce
 
 ## How It Compares
 
-| | Dockyard | Portainer | Yacht | Cockpit |
-|---|---|---|---|---|
-| No agent on target servers | ✅ SSH only | ❌ Requires agent | ❌ Requires agent | ❌ Requires agent |
-| Multi-server (dev/stage/prod) | ✅ | ✅ Business tier | ❌ | ✅ |
-| Works with existing compose files | ✅ | ⚠️ Reimports stacks | ✅ | ❌ |
-| Edit env vars / image tags in UI | ✅ | ⚠️ Limited | ❌ | ❌ |
-| Parameterized build & push | ✅ | ❌ | ❌ | ❌ |
-| Deploy history | ✅ | ❌ | ❌ | ❌ |
-| Webhook / email notifications | ✅ | ❌ | ❌ | ❌ |
-| Self-hosted, fully open source | ✅ | ✅ CE | ✅ | ✅ |
+|                                   | Dockyard    | Portainer           | Yacht             | Cockpit           |
+| --------------------------------- | ----------- | ------------------- | ----------------- | ----------------- |
+| No agent on target servers        | ✅ SSH only | ❌ Requires agent   | ❌ Requires agent | ❌ Requires agent |
+| Multi-server (dev/stage/prod)     | ✅          | ✅ Business tier    | ❌                | ✅                |
+| Works with existing compose files | ✅          | ⚠️ Reimports stacks | ✅                | ❌                |
+| Edit env vars / image tags in UI  | ✅          | ⚠️ Limited          | ❌                | ❌                |
+| Parameterized build & push        | ✅          | ❌                  | ❌                | ❌                |
+| Deploy history                    | ✅          | ❌                  | ❌                | ❌                |
+| Webhook / email notifications     | ✅          | ❌                  | ❌                | ❌                |
+| Self-hosted, fully open source    | ✅          | ✅ CE               | ✅                | ✅                |
 
 **The key difference:** Dockyard uses plain SSH — it reads and writes your actual `docker-compose.yml` and `.env` files directly. There is no separate stack state to sync, no agent to install, and no Docker socket exposure. If you can already SSH into your servers, Dockyard works.
 
@@ -128,16 +128,16 @@ Select an environment (dev / staging / prod) from the sidebar. Dockyard connects
 
 Each container shows its image tag, status, and action buttons:
 
-| Button | Action |
-|---|---|
-| `↻` Restart | `docker compose restart <service>` |
-| `▶` Up | `docker compose up -d <service>` |
-| `■` Stop | `docker compose stop <service>` |
-| `⚡` Force recreate | `up -d --force-recreate` (current image) |
-| `⤓` Pull & recreate | Pull latest for current tag, then recreate |
-| Tag badge | Update the image tag (edits `docker-compose.yml` or `.env`) |
-| `Env` | Edit environment variables inline |
-| `Logs` | Stream live logs in a panel |
+| Button              | Action                                                      |
+| ------------------- | ----------------------------------------------------------- |
+| `↻` Restart         | `docker compose restart <service>`                          |
+| `▶` Up              | `docker compose up -d <service>`                            |
+| `■` Stop            | `docker compose stop <service>`                             |
+| `⚡` Force recreate | `up -d --force-recreate` (current image)                    |
+| `⤓` Pull & recreate | Pull latest for current tag, then recreate                  |
+| Tag badge           | Update the image tag (edits `docker-compose.yml` or `.env`) |
+| `Env`               | Edit environment variables inline                           |
+| `Logs`              | Stream live logs in a panel                                 |
 
 ### Build & Push
 

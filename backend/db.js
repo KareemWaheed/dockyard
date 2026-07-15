@@ -1,18 +1,20 @@
 // backend/db.js
-const Database = require('better-sqlite3');
-const fs = require('fs');
-const path = require('path');
-const { encrypt } = require('./encryption');
+const Database = require("better-sqlite3");
+const fs = require("fs");
+const path = require("path");
+const { encrypt } = require("./encryption");
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'dashboard.db');
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "..", "data", "dashboard.db");
 const DATA_DIR = path.dirname(DB_PATH);
-const CONFIG_PATH = process.env.CONFIG_PATH || path.join(__dirname, '..', 'config.json');
+const CONFIG_PATH =
+  process.env.CONFIG_PATH || path.join(__dirname, "..", "config.json");
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS servers (
@@ -126,23 +128,30 @@ db.exec(`
 `);
 
 // Column migrations — tolerate "duplicate column" errors for idempotency
-try { db.exec("ALTER TABLE build_runs ADD COLUMN commits_json TEXT"); } catch {}
+try {
+  db.exec("ALTER TABLE build_runs ADD COLUMN commits_json TEXT");
+} catch {}
 
 // Migrate config.json on first run if servers table is empty
-const serverCount = db.prepare('SELECT COUNT(*) as n FROM servers').get().n;
+const serverCount = db.prepare("SELECT COUNT(*) as n FROM servers").get().n;
 if (serverCount === 0 && fs.existsSync(CONFIG_PATH)) {
   try {
-    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
     migrateConfig(cfg);
     try {
-      fs.renameSync(CONFIG_PATH, CONFIG_PATH + '.bak');
+      fs.renameSync(CONFIG_PATH, CONFIG_PATH + ".bak");
     } catch (renameErr) {
-      console.error('Migration succeeded but could not rename config.json:', renameErr.message);
+      console.error(
+        "Migration succeeded but could not rename config.json:",
+        renameErr.message,
+      );
     }
-    console.log('Migrated config.json to SQLite. Renamed to config.json.bak');
+    console.log("Migrated config.json to SQLite. Renamed to config.json.bak");
   } catch (err) {
-    console.error('Failed to migrate config.json:', err.message);
-    console.error('Fix config.json and restart, or add servers via the Settings UI.');
+    console.error("Failed to migrate config.json:", err.message);
+    console.error(
+      "Fix config.json and restart, or add servers via the Settings UI.",
+    );
   }
 } else {
   console.log(`DB ready. Servers: ${serverCount}, migration skipped.`);
@@ -164,29 +173,36 @@ function migrateConfig(cfg) {
       const info = insertServer.run({
         env_key: envKey,
         name: server.name || envKey,
-        host: server.host || '',
-        ssh_username: server.ssh?.username || '',
+        host: server.host || "",
+        ssh_username: server.ssh?.username || "",
         ssh_password: encrypt(server.ssh?.password || null),
         ssh_key_path: server.ssh?.privateKeyPath || null,
         ssh_passphrase: encrypt(server.ssh?.passphrase || null),
-        docker_compose_cmd: server.dockerCompose || 'docker compose',
+        docker_compose_cmd: server.dockerCompose || "docker compose",
       });
-      for (const stack of (server.composeStacks || [])) {
-        insertStack.run({ server_id: info.lastInsertRowid, name: stack.name, path: stack.path });
+      for (const stack of server.composeStacks || []) {
+        insertStack.run({
+          server_id: info.lastInsertRowid,
+          name: stack.name,
+          path: stack.path,
+        });
       }
     }
 
     if (cfg.awsSg) {
-      db.prepare("INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('awsSg', ?)")
-        .run(JSON.stringify(cfg.awsSg));
+      db.prepare(
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('awsSg', ?)",
+      ).run(JSON.stringify(cfg.awsSg));
     }
     if (cfg.gitlab) {
-      db.prepare("INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('gitlab', ?)")
-        .run(JSON.stringify(cfg.gitlab));
+      db.prepare(
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('gitlab', ?)",
+      ).run(JSON.stringify(cfg.gitlab));
     }
     if (cfg.projects) {
-      db.prepare("INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('projects', ?)")
-        .run(JSON.stringify(cfg.projects));
+      db.prepare(
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('projects', ?)",
+      ).run(JSON.stringify(cfg.projects));
     }
   });
 
@@ -194,32 +210,54 @@ function migrateConfig(cfg) {
 }
 
 // Add aws_sg_id column if not present (migration)
-try { db.exec('ALTER TABLE servers ADD COLUMN aws_sg_id TEXT'); } catch {}
-try { db.exec('ALTER TABLE servers ADD COLUMN maintenance_flag_path TEXT'); } catch {}
+try {
+  db.exec("ALTER TABLE servers ADD COLUMN aws_sg_id TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE servers ADD COLUMN maintenance_flag_path TEXT");
+} catch {}
 
 // Ensure projects have params arrays (migration for pre-params configs)
 try {
-  const row = db.prepare("SELECT value_json FROM app_config WHERE key = 'projects'").get();
+  const row = db
+    .prepare("SELECT value_json FROM app_config WHERE key = 'projects'")
+    .get();
   if (row) {
     const projects = JSON.parse(row.value_json);
     let changed = false;
     for (const [key, proj] of Object.entries(projects)) {
       if (!proj.params) {
         proj.params = [
-          { name: 'env', label: 'Environment', type: 'select', options: ['dev', 'staging', 'prod'], default: 'dev', flag: '-e', required: true },
-          { name: 'tag', label: 'Tag', type: 'string', flag: '-t', required: true, placeholder: 'e.g. 1.4.2' },
+          {
+            name: "env",
+            label: "Environment",
+            type: "select",
+            options: ["dev", "staging", "prod"],
+            default: "dev",
+            flag: "-e",
+            required: true,
+          },
+          {
+            name: "tag",
+            label: "Tag",
+            type: "string",
+            flag: "-t",
+            required: true,
+            placeholder: "e.g. 1.4.2",
+          },
         ];
         changed = true;
       }
     }
     if (changed) {
-      db.prepare("UPDATE app_config SET value_json = ? WHERE key = 'projects'")
-        .run(JSON.stringify(projects));
-      console.log('Migrated projects config: added default params.');
+      db.prepare(
+        "UPDATE app_config SET value_json = ? WHERE key = 'projects'",
+      ).run(JSON.stringify(projects));
+      console.log("Migrated projects config: added default params.");
     }
   }
 } catch (err) {
-  console.error('Projects params migration failed:', err.message);
+  console.error("Projects params migration failed:", err.message);
 }
 
 module.exports = db;

@@ -1,13 +1,15 @@
 // backend/services/backup.js
-const { encrypt, decryptField } = require('../encryption');
+const { encrypt, decryptField } = require("../encryption");
 
 function exportConfig(db) {
-  const servers = db.prepare('SELECT * FROM servers').all();
-  const stacks = db.prepare('SELECT * FROM compose_stacks').all();
-  const notifications = db.prepare('SELECT * FROM notifications').all();
-  const appConfigRows = db.prepare('SELECT key, value_json FROM app_config').all();
-  const flywayEnvs = db.prepare('SELECT * FROM flyway_envs').all();
-  const flywayDbs = db.prepare('SELECT * FROM flyway_databases').all();
+  const servers = db.prepare("SELECT * FROM servers").all();
+  const stacks = db.prepare("SELECT * FROM compose_stacks").all();
+  const notifications = db.prepare("SELECT * FROM notifications").all();
+  const appConfigRows = db
+    .prepare("SELECT key, value_json FROM app_config")
+    .all();
+  const flywayEnvs = db.prepare("SELECT * FROM flyway_envs").all();
+  const flywayDbs = db.prepare("SELECT * FROM flyway_databases").all();
 
   const app_config = {};
   for (const row of appConfigRows) {
@@ -23,7 +25,7 @@ function exportConfig(db) {
       ssh_key_content: decryptField(s.ssh_key_content),
       ssh_passphrase: decryptField(s.ssh_passphrase),
       stacks: stacks
-        .filter(st => st.server_id === id)
+        .filter((st) => st.server_id === id)
         .map(({ id: _id, server_id: _sid, ...st }) => st),
     })),
     notifications: notifications.map(({ id, ...n }) => n),
@@ -31,7 +33,7 @@ function exportConfig(db) {
     flyway_envs: flywayEnvs.map(({ id, ...e }) => ({
       ...e,
       databases: flywayDbs
-        .filter(d => d.env_id === id)
+        .filter((d) => d.env_id === id)
         .map(({ id: _id, env_id: _eid, ...d }) => ({
           ...d,
           db_password: decryptField(d.db_password),
@@ -41,65 +43,96 @@ function exportConfig(db) {
 }
 
 function importConfig(db, payload) {
-  if (!payload || !payload.version) throw new Error('Invalid payload: missing version');
+  if (!payload || !payload.version)
+    throw new Error("Invalid payload: missing version");
   const { servers, notifications, app_config, flyway_envs } = payload;
   if (!servers && !notifications && !app_config && !flyway_envs) {
-    throw new Error('Invalid payload: no data');
+    throw new Error("Invalid payload: no data");
   }
 
   db.transaction(() => {
-    db.prepare('DELETE FROM compose_stacks').run();
-    db.prepare('DELETE FROM servers').run();
-    db.prepare('DELETE FROM notifications').run();
-    db.prepare('DELETE FROM app_config').run();
-    db.prepare('DELETE FROM flyway_databases').run();
-    db.prepare('DELETE FROM flyway_envs').run();
+    db.prepare("DELETE FROM compose_stacks").run();
+    db.prepare("DELETE FROM servers").run();
+    db.prepare("DELETE FROM notifications").run();
+    db.prepare("DELETE FROM app_config").run();
+    db.prepare("DELETE FROM flyway_databases").run();
+    db.prepare("DELETE FROM flyway_envs").run();
 
-    for (const s of (servers || [])) {
+    for (const s of servers || []) {
       const { stacks, ...row } = s;
-      const { lastInsertRowid: sid } = db.prepare(`
+      const { lastInsertRowid: sid } = db
+        .prepare(
+          `
         INSERT INTO servers (env_key, name, host, ssh_username, ssh_password, ssh_key_path,
                              ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id,
                              maintenance_flag_path)
         VALUES (@env_key, @name, @host, @ssh_username, @ssh_password, @ssh_key_path,
                 @ssh_key_content, @ssh_passphrase, @docker_compose_cmd, @aws_sg_id,
                 @maintenance_flag_path)
-      `).run({
-        ssh_password: null, ssh_key_path: null, ssh_key_content: null,
-        ssh_passphrase: null, docker_compose_cmd: 'docker compose', aws_sg_id: null,
-        maintenance_flag_path: null,
-        ...row,
-        ssh_password: encrypt(row.ssh_password || null),
-        ssh_key_content: encrypt(row.ssh_key_content || null),
-        ssh_passphrase: encrypt(row.ssh_passphrase || null),
-      });
-      for (const st of (stacks || [])) {
-        db.prepare('INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)')
-          .run(sid, st.name, st.path);
+      `,
+        )
+        .run({
+          ssh_password: null,
+          ssh_key_path: null,
+          ssh_key_content: null,
+          ssh_passphrase: null,
+          docker_compose_cmd: "docker compose",
+          aws_sg_id: null,
+          maintenance_flag_path: null,
+          ...row,
+          ssh_password: encrypt(row.ssh_password || null),
+          ssh_key_content: encrypt(row.ssh_key_content || null),
+          ssh_passphrase: encrypt(row.ssh_passphrase || null),
+        });
+      for (const st of stacks || []) {
+        db.prepare(
+          "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
+        ).run(sid, st.name, st.path);
       }
     }
 
-    for (const n of (notifications || [])) {
-      db.prepare('INSERT INTO notifications (type, label, config_json, enabled, envs_json) VALUES (?, ?, ?, ?, ?)')
-        .run(n.type, n.label, n.config_json, n.enabled ?? 1, n.envs_json ?? null);
+    for (const n of notifications || []) {
+      db.prepare(
+        "INSERT INTO notifications (type, label, config_json, enabled, envs_json) VALUES (?, ?, ?, ?, ?)",
+      ).run(
+        n.type,
+        n.label,
+        n.config_json,
+        n.enabled ?? 1,
+        n.envs_json ?? null,
+      );
     }
 
     for (const [key, value] of Object.entries(app_config || {})) {
-      db.prepare('INSERT INTO app_config (key, value_json) VALUES (?, ?)').run(key, JSON.stringify(value));
+      db.prepare("INSERT INTO app_config (key, value_json) VALUES (?, ?)").run(
+        key,
+        JSON.stringify(value),
+      );
     }
 
-    for (const env of (flyway_envs || [])) {
+    for (const env of flyway_envs || []) {
       const { databases, name, description } = env;
-      const { lastInsertRowid: eid } = db.prepare(
-        'INSERT INTO flyway_envs (name, description) VALUES (?, ?)'
-      ).run(name, description ?? null);
-      for (const d of (databases || [])) {
-        db.prepare(`
+      const { lastInsertRowid: eid } = db
+        .prepare("INSERT INTO flyway_envs (name, description) VALUES (?, ?)")
+        .run(name, description ?? null);
+      for (const d of databases || []) {
+        db.prepare(
+          `
           INSERT INTO flyway_databases
             (env_id, name, url, db_user, db_password, schemas, locations, baseline_on_migrate, baseline_version)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(eid, d.name, d.url, d.db_user, encrypt(d.db_password), d.schemas,
-               d.locations, d.baseline_on_migrate, d.baseline_version);
+        `,
+        ).run(
+          eid,
+          d.name,
+          d.url,
+          d.db_user,
+          encrypt(d.db_password),
+          d.schemas,
+          d.locations,
+          d.baseline_on_migrate,
+          d.baseline_version,
+        );
       }
     }
   })();
