@@ -2,7 +2,7 @@ name: Build & Push Docker Image
 
 on:
   push:
-    branches: [master, feat/secrets-encryption]
+    branches: [master, feat/secrets-encryption, feat/caprover-deploy]
   workflow_dispatch:
 
 jobs:
