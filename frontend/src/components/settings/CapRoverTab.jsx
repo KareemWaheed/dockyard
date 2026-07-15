@@ -6,6 +6,7 @@ import {
   createCapRoverTarget,
   updateCapRoverTarget,
   deleteCapRoverTarget,
+  testCapRoverTarget,
 } from "../../api";
 
 const EMPTY = {
@@ -23,6 +24,8 @@ export default function CapRoverTab() {
   const [form, setForm] = useState(null);
   const [editId, setEditId] = useState(null);
   const [error, setError] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
 
   const load = () =>
     fetchCapRoverTargets()
@@ -55,8 +58,50 @@ export default function CapRoverTab() {
   const cancel = () => {
     setForm(null);
     setError(null);
+    setTestResult(null);
   };
-  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setField = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    // A changed field invalidates the last test verdict
+    setTestResult(null);
+  };
+
+  const test = async () => {
+    const { caprover_url, app_name, app_token } = form;
+    if (!caprover_url || !app_name) {
+      setError("CapRover URL and app name are required to test.");
+      return;
+    }
+    if (!app_token && !editId) {
+      setError("App token is required to test.");
+      return;
+    }
+    setTesting(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const r = await testCapRoverTarget({
+        caprover_url,
+        app_name,
+        app_token,
+        id: editId || undefined,
+      });
+      setTestResult(
+        `✓ Connected — app '${r.appName}' found` +
+          (r.instanceCount !== null
+            ? ` (${r.instanceCount} instance${r.instanceCount === 1 ? "" : "s"})`
+            : ""),
+      );
+    } catch (err) {
+      let msg = err.message;
+      try {
+        msg = JSON.parse(err.message).error || msg;
+      } catch {}
+      setError(`Test failed: ${msg}`);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const save = async () => {
     const { project, env_key, caprover_url, app_name, app_token } = form;
@@ -181,9 +226,17 @@ export default function CapRoverTab() {
               {error}
             </p>
           )}
-          <div style={{ display: "flex", gap: 6 }}>
+          {testResult && (
+            <p style={{ color: "var(--green)", fontSize: 11, marginBottom: 8 }}>
+              {testResult}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <button className="btn-primary" onClick={save}>
               Save
+            </button>
+            <button onClick={test} disabled={testing}>
+              {testing ? "Testing…" : "Test connection"}
             </button>
             <button onClick={cancel}>Cancel</button>
           </div>

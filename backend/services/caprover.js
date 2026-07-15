@@ -30,7 +30,11 @@ function headers(appToken) {
 }
 
 async function capFetch(url, appToken, options = {}) {
-  const res = await fetch(url, { ...options, headers: headers(appToken) });
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(15_000),
+    ...options,
+    headers: headers(appToken),
+  });
   const text = await res.text();
   let body;
   try {
@@ -41,7 +45,7 @@ async function capFetch(url, appToken, options = {}) {
   // CapRover wraps everything in { status, description, data } — status 100 = OK.
   if (body.status !== 100) {
     throw new Error(
-      `CapRover error ${body.status}: ${body.description || "unknown error"}`
+      `CapRover error ${body.status}: ${body.description || "unknown error"}`,
     );
   }
   return body;
@@ -50,13 +54,38 @@ async function capFetch(url, appToken, options = {}) {
 async function getAppData(baseUrl, appName, appToken) {
   const body = await capFetch(
     `${baseUrl}/api/v2/user/apps/appData/${encodeURIComponent(appName)}`,
-    appToken
+    appToken,
   );
   return body.data || {};
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Validates URL + app name + token in one authenticated read — the same call
+// the deploy poller uses, so a passing test means deploys will authenticate.
+async function testConnection({ caproverUrl, appName, appToken }) {
+  const baseUrl = normalizeUrl(caproverUrl);
+  try {
+    const data = await getAppData(baseUrl, appName, appToken);
+    return {
+      ok: true,
+      appName,
+      isAppBuilding: !!data.isAppBuilding,
+      instanceCount: data.instanceCount ?? null,
+    };
+  } catch (err) {
+    if (err.name === "TimeoutError" || err.name === "AbortError") {
+      throw new Error(
+        `Could not reach ${baseUrl} within 15s — check the URL and network access`,
+      );
+    }
+    if (err.cause?.code) {
+      throw new Error(`Could not reach ${baseUrl} — ${err.cause.code}`);
+    }
+    throw err;
+  }
 }
 
 // Triggers the deploy and waits for CapRover to finish updating the app.
@@ -73,13 +102,13 @@ async function deployImage({
   const definition = JSON.stringify({ schemaVersion: 2, imageName });
 
   onLog(
-    `Deploying ${imageName} to CapRover app '${appName}' (${baseUrl})...\n`
+    `Deploying ${imageName} to CapRover app '${appName}' (${baseUrl})...\n`,
   );
   if (gitHash) onLog(`Git hash: ${gitHash}\n`);
 
   await capFetch(
     `${baseUrl}/api/v2/user/apps/appData/${encodeURIComponent(
-      appName
+      appName,
     )}?detached=1`,
     appToken,
     {
@@ -88,7 +117,7 @@ async function deployImage({
         captainDefinitionContent: definition,
         gitHash: gitHash || "",
       }),
-    }
+    },
   );
   onLog("Deploy accepted by CapRover. Waiting for the app to update...\n");
 
@@ -111,7 +140,7 @@ async function deployImage({
     }
     if (data.isBuildFailed) {
       throw new Error(
-        "CapRover reports the deploy failed — check the CapRover app logs (often an image pull/auth issue)."
+        "CapRover reports the deploy failed — check the CapRover app logs (often an image pull/auth issue).",
       );
     }
     onLog(`Deploy complete — '${appName}' is now running ${imageName}.\n`);
@@ -120,8 +149,8 @@ async function deployImage({
   throw new Error(
     `Timed out after ${
       POLL_TIMEOUT_MS / 60000
-    } minutes waiting for CapRover to finish the deploy.`
+    } minutes waiting for CapRover to finish the deploy.`,
   );
 }
 
-module.exports = { deployImage, normalizeUrl };
+module.exports = { deployImage, testConnection, normalizeUrl };

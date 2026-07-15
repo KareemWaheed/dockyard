@@ -13,7 +13,7 @@ export async function containerAction(env, containerName, action, body) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    }
+    },
   );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -66,7 +66,7 @@ export async function startBuild(project, branch, args) {
 // List runs for a project (no log content) — returns { runs, hasMore }
 export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
   const r = await fetch(
-    `${BASE}/builds/${project}/runs?offset=${offset}&limit=${limit}`
+    `${BASE}/builds/${project}/runs?offset=${offset}&limit=${limit}`,
   );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -85,7 +85,7 @@ export async function cancelBuildRun(project, buildNumber) {
 export async function replayBuildRun(project, buildNumber) {
   const r = await fetch(
     `${BASE}/builds/${project}/runs/${buildNumber}/replay`,
-    { method: "POST" }
+    { method: "POST" },
   );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -171,7 +171,7 @@ export async function setMaintenance(env, enabled) {
 
 export async function fetchHistory(
   env,
-  { container, limit = 100, offset = 0 } = {}
+  { container, limit = 100, offset = 0 } = {},
 ) {
   const params = new URLSearchParams({ limit, offset });
   if (container) params.set("container", container);
@@ -285,6 +285,17 @@ export async function updateCapRoverTarget(id, body) {
   return r.json();
 }
 
+// Validate a CapRover target's URL/app/token without saving it
+export async function testCapRoverTarget(body) {
+  const r = await fetch(`${BASE}/settings/caprover-targets/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function deleteCapRoverTarget(id) {
   const r = await fetch(`${BASE}/settings/caprover-targets/${id}`, {
     method: "DELETE",
@@ -298,7 +309,7 @@ export async function deployRunToCapRover(
   project,
   buildNumber,
   targetId,
-  imageName
+  imageName,
 ) {
   const r = await fetch(
     `${BASE}/builds/${project}/runs/${buildNumber}/deploy-caprover`,
@@ -306,7 +317,7 @@ export async function deployRunToCapRover(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetId, imageName }),
-    }
+    },
   );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
