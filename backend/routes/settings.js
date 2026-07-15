@@ -43,7 +43,7 @@ router.post("/servers", (req, res) => {
                          ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id,
                          maintenance_flag_path)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `,
+  `
     )
     .run(
       env_key,
@@ -56,12 +56,12 @@ router.post("/servers", (req, res) => {
       encrypt(ssh_passphrase ?? null),
       docker_compose_cmd ?? "docker compose",
       aws_sg_id ?? null,
-      maintenance_flag_path ?? null,
+      maintenance_flag_path ?? null
     );
   const serverId = info.lastInsertRowid;
   for (const stack of stacks || []) {
     db.prepare(
-      "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
+      "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)"
     ).run(serverId, stack.name, stack.path);
   }
   res.json({ id: serverId });
@@ -87,7 +87,7 @@ router.put("/servers/:id", (req, res) => {
     UPDATE servers SET name=?, host=?, ssh_username=?, ssh_password=?, ssh_key_path=?,
       ssh_key_content=?, ssh_passphrase=?, docker_compose_cmd=?, aws_sg_id=?,
       maintenance_flag_path=? WHERE id=?
-  `,
+  `
   ).run(
     name,
     host,
@@ -99,14 +99,14 @@ router.put("/servers/:id", (req, res) => {
     docker_compose_cmd ?? "docker compose",
     aws_sg_id ?? null,
     maintenance_flag_path ?? null,
-    id,
+    id
   );
   // Replace stacks
   if (stacks !== undefined) {
     db.prepare("DELETE FROM compose_stacks WHERE server_id = ?").run(id);
     for (const stack of stacks) {
       db.prepare(
-        "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
+        "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)"
       ).run(id, stack.name, stack.path);
     }
   }
@@ -137,14 +137,14 @@ router.post("/notifications", (req, res) => {
       `
     INSERT INTO notifications (type, label, config_json, enabled, envs_json)
     VALUES (?, ?, ?, ?, ?)
-  `,
+  `
     )
     .run(
       type,
       label,
       JSON.stringify(config_json),
       enabled ? 1 : 0,
-      envs_json ? JSON.stringify(envs_json) : null,
+      envs_json ? JSON.stringify(envs_json) : null
     );
   res.json({ id: info.lastInsertRowid });
 });
@@ -155,14 +155,14 @@ router.put("/notifications/:id", (req, res) => {
   db.prepare(
     `
     UPDATE notifications SET type=?, label=?, config_json=?, enabled=?, envs_json=? WHERE id=?
-  `,
+  `
   ).run(
     type,
     label,
     JSON.stringify(config_json),
     enabled ? 1 : 0,
     envs_json ? JSON.stringify(envs_json) : null,
-    id,
+    id
   );
   res.json({ ok: true });
 });
@@ -191,6 +191,89 @@ router.post("/notifications/:id/test", async (req, res) => {
   }
 });
 
+// ─── CapRover Targets ────────────────────────────────────────────────────────
+// One row per (project, env). app_token is stored encrypted and returned
+// masked — the UI never needs to read it back, only overwrite it.
+
+router.get("/caprover-targets", (req, res) => {
+  const rows = db
+    .prepare(
+      "SELECT id, project, env_key, name, caprover_url, app_name, created_at FROM caprover_targets ORDER BY project, env_key"
+    )
+    .all();
+  res.json(rows);
+});
+
+router.post("/caprover-targets", (req, res) => {
+  const { project, env_key, name, caprover_url, app_name, app_token } =
+    req.body;
+  if (!project || !env_key || !caprover_url || !app_name || !app_token) {
+    return res
+      .status(400)
+      .json({
+        error:
+          "project, env_key, caprover_url, app_name and app_token are required",
+      });
+  }
+  try {
+    const info = db
+      .prepare(
+        `
+      INSERT INTO caprover_targets (project, env_key, name, caprover_url, app_name, app_token)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `
+      )
+      .run(
+        project,
+        env_key,
+        name || env_key,
+        caprover_url,
+        app_name,
+        encrypt(app_token)
+      );
+    res.json({ id: info.lastInsertRowid });
+  } catch (err) {
+    if (/UNIQUE/.test(err.message))
+      return res
+        .status(409)
+        .json({
+          error: "A target for this project + environment already exists",
+        });
+    throw err;
+  }
+});
+
+router.put("/caprover-targets/:id", (req, res) => {
+  const { id } = req.params;
+  const existing = db
+    .prepare("SELECT * FROM caprover_targets WHERE id = ?")
+    .get(id);
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const { project, env_key, name, caprover_url, app_name, app_token } =
+    req.body;
+  // Blank token means "keep the current one" (same convention as Flyway DB passwords)
+  const token = app_token ? encrypt(app_token) : existing.app_token;
+  db.prepare(
+    `
+    UPDATE caprover_targets SET project=?, env_key=?, name=?, caprover_url=?, app_name=?, app_token=? WHERE id=?
+  `
+  ).run(
+    project ?? existing.project,
+    env_key ?? existing.env_key,
+    name ?? existing.name,
+    caprover_url ?? existing.caprover_url,
+    app_name ?? existing.app_name,
+    token,
+    id
+  );
+  res.json({ ok: true });
+});
+
+router.delete("/caprover-targets/:id", (req, res) => {
+  db.prepare("DELETE FROM caprover_targets WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 // ─── App Config ──────────────────────────────────────────────────────────────
 
 router.get("/config/:key", (req, res) => {
@@ -203,7 +286,7 @@ router.get("/config/:key", (req, res) => {
 
 router.put("/config/:key", (req, res) => {
   db.prepare(
-    "INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)",
+    "INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)"
   ).run(req.params.key, JSON.stringify(req.body));
   res.json({ ok: true });
 });

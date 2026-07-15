@@ -7,6 +7,8 @@ import {
   fetchBuildRuns,
   cancelBuildRun,
   replayBuildRun,
+  fetchCapRoverTargets,
+  deployRunToCapRover,
 } from "../api";
 import SearchableSelect from "./SearchableSelect";
 
@@ -140,6 +142,11 @@ export default function BuildView() {
   const outputRef = useRef(null);
   const wsRef = useRef(null);
   const [stuckAlert, setStuckAlert] = useState(false);
+  const [caproverTargets, setCaproverTargets] = useState([]);
+  const [deployTargetId, setDeployTargetId] = useState("");
+  const [deployImage, setDeployImage] = useState("");
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState(null);
 
   useEffect(() => {
     fetchProjects()
@@ -159,6 +166,9 @@ export default function BuildView() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetchCapRoverTargets()
+      .then(setCaproverTargets)
+      .catch(() => {});
   }, []);
 
   const openRun = useCallback((run) => {
@@ -190,9 +200,11 @@ export default function BuildView() {
                   ...r,
                   status: msg.status,
                   commits_json: msg.commits_json ?? r.commits_json,
+                  pushed_images_json:
+                    msg.pushed_images_json ?? r.pushed_images_json,
                 }
-              : r,
-          ),
+              : r
+          )
         );
       }
     };
@@ -248,8 +260,14 @@ export default function BuildView() {
     () => () => {
       wsRef.current?.close();
     },
-    [],
+    []
   );
+
+  // Image choice and errors are per-run; the target env can persist across runs.
+  useEffect(() => {
+    setDeployImage("");
+    setDeployError(null);
+  }, [selectedRunId]);
 
   const proj = activeProject ? projects[activeProject] : null;
   const params = proj?.params || [];
@@ -319,7 +337,7 @@ export default function BuildView() {
     try {
       const result = await replayBuildRun(
         activeProject,
-        selectedRun.build_number,
+        selectedRun.build_number
       );
       const run = {
         id: result.runId,
@@ -342,7 +360,7 @@ export default function BuildView() {
     try {
       const { runs: more, hasMore: moreLeft } = await fetchBuildRuns(
         activeProject,
-        { offset: runs.length },
+        { offset: runs.length }
       );
       setRuns((prev) => [...prev, ...more]);
       setHasMore(moreLeft);
@@ -361,7 +379,7 @@ export default function BuildView() {
       // Optimistically reflect the cancellation — the WS done message will
       // confirm the final status, but the button should disappear immediately.
       setRuns((prev) =>
-        prev.map((r) => (r.id === run.id ? { ...r, status: "cancelled" } : r)),
+        prev.map((r) => (r.id === run.id ? { ...r, status: "cancelled" } : r))
       );
       setLiveStatus("cancelled");
     } catch (err) {
@@ -384,6 +402,74 @@ export default function BuildView() {
       return [];
     }
   })();
+
+  const parsedDeployMeta = (() => {
+    if (selectedRun?.type !== "deploy") return [];
+    try {
+      const a = JSON.parse(selectedRun.args_json || "{}");
+      return [
+        a.sourceBuildNumber && {
+          label: "From build",
+          value: `#${a.sourceBuildNumber}`,
+        },
+        selectedRun.branch && { label: "Branch", value: selectedRun.branch },
+        a.gitHash && { label: "Git hash", value: a.gitHash.slice(0, 9) },
+        a.image && { label: "Image", value: a.image },
+        a.env && { label: "Environment", value: a.env },
+        a.app && { label: "CapRover app", value: a.app },
+      ].filter(Boolean);
+    } catch {
+      return [];
+    }
+  })();
+
+  const projectTargets = caproverTargets.filter(
+    (t) => t.project === activeProject
+  );
+  const pushedImages = (() => {
+    try {
+      return JSON.parse(selectedRun?.pushed_images_json || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const deployableImage =
+    deployImage || (pushedImages.length === 1 ? pushedImages[0] : "");
+  const canDeploy =
+    selectedRun?.type === "build" &&
+    (liveStatus === "success" || selectedRun?.status === "success") &&
+    !isSelectedActive &&
+    pushedImages.length > 0 &&
+    projectTargets.length > 0;
+
+  const handleDeploy = async () => {
+    if (!selectedRun || deploying || !deployTargetId || !deployableImage)
+      return;
+    setDeploying(true);
+    setDeployError(null);
+    try {
+      const result = await deployRunToCapRover(
+        activeProject,
+        selectedRun.build_number,
+        parseInt(deployTargetId, 10),
+        deployableImage
+      );
+      const run = {
+        id: result.runId,
+        build_number: result.buildNumber,
+        type: "deploy",
+        status: "running",
+        branch: selectedRun.branch,
+        started_at: new Date().toISOString(),
+      };
+      setRuns((prev) => [run, ...prev]);
+      openRun(run);
+    } catch (err) {
+      setDeployError(err.message);
+    } finally {
+      setDeploying(false);
+    }
+  };
 
   if (loading)
     return (
@@ -414,7 +500,9 @@ export default function BuildView() {
         {projectKeys.map((key) => (
           <button
             key={key}
-            className={`build-project-item ${activeProject === key ? "active" : ""}`}
+            className={`build-project-item ${
+              activeProject === key ? "active" : ""
+            }`}
             onClick={() => setActiveProject(key)}
           >
             {projects[key].name}
@@ -434,7 +522,7 @@ export default function BuildView() {
                     {recent[key].tag ? ` · ${recent[key].tag}` : ""}
                   </div>
                 </div>
-              ),
+              )
           )}
         </div>
       </div>
@@ -527,7 +615,11 @@ export default function BuildView() {
                     >
                       <span style={{ color: "var(--text)", fontSize: 12 }}>
                         #{run.build_number}{" "}
-                        {run.type === "clone" ? "clone" : run.branch || ""}
+                        {run.type === "clone"
+                          ? "clone"
+                          : run.type === "deploy"
+                          ? `🚀 ${run.branch || "deploy"}`
+                          : run.branch || ""}
                       </span>
                       <span
                         style={{
@@ -652,34 +744,111 @@ export default function BuildView() {
             )}
           </div>
         </div>
-        {selectedRun?.type === "build" &&
-          (parsedParams.length > 0 || parsedCommits.length > 0) && (
-            <div className="build-run-meta">
-              {parsedParams.length > 0 && (
-                <div className="build-meta-section">
-                  <div className="build-meta-label">Params</div>
-                  {parsedParams.map(({ label, value }) => (
-                    <div key={label} className="build-meta-row">
-                      <span className="build-meta-key">{label}</span>
-                      <span className="build-meta-val">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {parsedCommits.length > 0 && (
-                <div className="build-meta-section">
-                  <div className="build-meta-label">Commits</div>
-                  {parsedCommits.map((c) => (
-                    <div key={c.hash} className="build-meta-commit">
-                      <span className="build-meta-hash">{c.shortHash}</span>
-                      <span className="build-meta-subject">{c.subject}</span>
-                      <span className="build-meta-date">{c.date}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        {canDeploy && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexWrap: "wrap",
+              margin: "0 0 6px",
+              padding: "6px 12px",
+              background: "rgba(158,206,106,0.08)",
+              border: "1px solid rgba(158,206,106,0.2)",
+              borderRadius: 4,
+            }}
+          >
+            <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
+              Deploy to CapRover:
+            </span>
+            <select
+              value={deployTargetId}
+              onChange={(e) => setDeployTargetId(e.target.value)}
+              style={{ fontSize: 11 }}
+            >
+              <option value="">Environment…</option>
+              {projectTargets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name || t.env_key} → {t.app_name}
+                </option>
+              ))}
+            </select>
+            {pushedImages.length > 1 && (
+              <select
+                value={deployImage}
+                onChange={(e) => setDeployImage(e.target.value)}
+                style={{ fontSize: 11, maxWidth: 320 }}
+              >
+                <option value="">Image…</option>
+                {pushedImages.map((im) => (
+                  <option key={im} value={im}>
+                    {im}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={handleDeploy}
+              disabled={deploying || !deployTargetId || !deployableImage}
+              style={{
+                background: "rgba(158,206,106,0.15)",
+                color: "var(--green)",
+                border: "1px solid rgba(158,206,106,0.3)",
+                borderRadius: 3,
+                padding: "2px 10px",
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              {deploying ? "Deploying…" : "🚀 Deploy"}
+            </button>
+            {deployError && (
+              <span style={{ color: "var(--red)", fontSize: 11 }}>
+                {deployError}
+              </span>
+            )}
+          </div>
+        )}
+        {(parsedParams.length > 0 ||
+          parsedCommits.length > 0 ||
+          parsedDeployMeta.length > 0) && (
+          <div className="build-run-meta">
+            {parsedDeployMeta.length > 0 && (
+              <div className="build-meta-section">
+                <div className="build-meta-label">Deployment</div>
+                {parsedDeployMeta.map(({ label, value }) => (
+                  <div key={label} className="build-meta-row">
+                    <span className="build-meta-key">{label}</span>
+                    <span className="build-meta-val">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parsedParams.length > 0 && (
+              <div className="build-meta-section">
+                <div className="build-meta-label">Params</div>
+                {parsedParams.map(({ label, value }) => (
+                  <div key={label} className="build-meta-row">
+                    <span className="build-meta-key">{label}</span>
+                    <span className="build-meta-val">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parsedCommits.length > 0 && (
+              <div className="build-meta-section">
+                <div className="build-meta-label">Commits</div>
+                {parsedCommits.map((c) => (
+                  <div key={c.hash} className="build-meta-commit">
+                    <span className="build-meta-hash">{c.shortHash}</span>
+                    <span className="build-meta-subject">{c.subject}</span>
+                    <span className="build-meta-date">{c.date}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {stuckAlert && (
           <div
             style={{
@@ -763,7 +932,7 @@ function ParamField({ param, value, onChange }) {
                   onChange(
                     selected
                       ? value.filter((x) => x !== opt)
-                      : [...(value || []), opt],
+                      : [...(value || []), opt]
                   )
                 }
               >

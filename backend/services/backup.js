@@ -10,6 +10,7 @@ function exportConfig(db) {
     .all();
   const flywayEnvs = db.prepare("SELECT * FROM flyway_envs").all();
   const flywayDbs = db.prepare("SELECT * FROM flyway_databases").all();
+  const caproverTargets = db.prepare("SELECT * FROM caprover_targets").all();
 
   const app_config = {};
   for (const row of appConfigRows) {
@@ -39,13 +40,18 @@ function exportConfig(db) {
           db_password: decryptField(d.db_password),
         })),
     })),
+    caprover_targets: caproverTargets.map(({ id, ...t }) => ({
+      ...t,
+      app_token: decryptField(t.app_token),
+    })),
   };
 }
 
 function importConfig(db, payload) {
   if (!payload || !payload.version)
     throw new Error("Invalid payload: missing version");
-  const { servers, notifications, app_config, flyway_envs } = payload;
+  const { servers, notifications, app_config, flyway_envs, caprover_targets } =
+    payload;
   if (!servers && !notifications && !app_config && !flyway_envs) {
     throw new Error("Invalid payload: no data");
   }
@@ -57,6 +63,7 @@ function importConfig(db, payload) {
     db.prepare("DELETE FROM app_config").run();
     db.prepare("DELETE FROM flyway_databases").run();
     db.prepare("DELETE FROM flyway_envs").run();
+    db.prepare("DELETE FROM caprover_targets").run();
 
     for (const s of servers || []) {
       const { stacks, ...row } = s;
@@ -69,7 +76,7 @@ function importConfig(db, payload) {
         VALUES (@env_key, @name, @host, @ssh_username, @ssh_password, @ssh_key_path,
                 @ssh_key_content, @ssh_passphrase, @docker_compose_cmd, @aws_sg_id,
                 @maintenance_flag_path)
-      `,
+      `
         )
         .run({
           ssh_password: null,
@@ -86,27 +93,27 @@ function importConfig(db, payload) {
         });
       for (const st of stacks || []) {
         db.prepare(
-          "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
+          "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)"
         ).run(sid, st.name, st.path);
       }
     }
 
     for (const n of notifications || []) {
       db.prepare(
-        "INSERT INTO notifications (type, label, config_json, enabled, envs_json) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO notifications (type, label, config_json, enabled, envs_json) VALUES (?, ?, ?, ?, ?)"
       ).run(
         n.type,
         n.label,
         n.config_json,
         n.enabled ?? 1,
-        n.envs_json ?? null,
+        n.envs_json ?? null
       );
     }
 
     for (const [key, value] of Object.entries(app_config || {})) {
       db.prepare("INSERT INTO app_config (key, value_json) VALUES (?, ?)").run(
         key,
-        JSON.stringify(value),
+        JSON.stringify(value)
       );
     }
 
@@ -121,7 +128,7 @@ function importConfig(db, payload) {
           INSERT INTO flyway_databases
             (env_id, name, url, db_user, db_password, schemas, locations, baseline_on_migrate, baseline_version)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
+        `
         ).run(
           eid,
           d.name,
@@ -131,9 +138,25 @@ function importConfig(db, payload) {
           d.schemas,
           d.locations,
           d.baseline_on_migrate,
-          d.baseline_version,
+          d.baseline_version
         );
       }
+    }
+
+    for (const t of caprover_targets || []) {
+      db.prepare(
+        `
+        INSERT INTO caprover_targets (project, env_key, name, caprover_url, app_name, app_token)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        t.project,
+        t.env_key,
+        t.name,
+        t.caprover_url,
+        t.app_name,
+        encrypt(t.app_token)
+      );
     }
   })();
 }

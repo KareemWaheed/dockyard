@@ -38,6 +38,7 @@ So I built Dockyard: a thin dashboard that sits on top of your existing SSH acce
 - **Environment variable editing** — modify env vars inline in compose files or in `.env` files
 - **Live log streaming** — tail container logs in real time via WebSocket
 - **Build & push** — dynamic parameterized builds: define projects and their CLI params in Settings, clone a Git repo, run your build script with the assembled flags, stream output to the browser
+- **CapRover deploys** — one click deploys an image pushed by a successful build to a CapRover app (per project + environment targets, app-token auth). The deploy carries the build's git hash so CapRover's version history shows real commit provenance
 - **Deploy history** — every action is logged with before/after state
 - **Notifications** — webhook and email alerts on deploys
 - **Add services** — add new containers to a compose stack from the UI
@@ -158,6 +159,7 @@ All configuration after first run is done through Settings:
 - **Build Projects** — manage project definitions and build param schemas
 - **Notifications** — configure webhook or email alerts on deploys
 - **AWS** — set credentials and Security Group IDs for the IP whitelist tool
+- **CapRover** — map build projects + environments to CapRover apps (URL, app name, app token) for one-click image deploys from the Build view
 
 ## Architecture
 

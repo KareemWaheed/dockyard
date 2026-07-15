@@ -131,6 +131,25 @@ db.exec(`
 try {
   db.exec("ALTER TABLE build_runs ADD COLUMN commits_json TEXT");
 } catch {}
+// JSON array of image refs the run pushed (BE builds push several per run)
+try {
+  db.exec("ALTER TABLE build_runs ADD COLUMN pushed_images_json TEXT");
+} catch {}
+
+// CapRover deploy targets — one row per (project, env). app_token is encrypted.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS caprover_targets (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project      TEXT NOT NULL,
+    env_key      TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    caprover_url TEXT NOT NULL,
+    app_name     TEXT NOT NULL,
+    app_token    TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(project, env_key)
+  );
+`);
 
 // Migrate config.json on first run if servers table is empty
 const serverCount = db.prepare("SELECT COUNT(*) as n FROM servers").get().n;
@@ -143,14 +162,14 @@ if (serverCount === 0 && fs.existsSync(CONFIG_PATH)) {
     } catch (renameErr) {
       console.error(
         "Migration succeeded but could not rename config.json:",
-        renameErr.message,
+        renameErr.message
       );
     }
     console.log("Migrated config.json to SQLite. Renamed to config.json.bak");
   } catch (err) {
     console.error("Failed to migrate config.json:", err.message);
     console.error(
-      "Fix config.json and restart, or add servers via the Settings UI.",
+      "Fix config.json and restart, or add servers via the Settings UI."
     );
   }
 } else {
@@ -191,17 +210,17 @@ function migrateConfig(cfg) {
 
     if (cfg.awsSg) {
       db.prepare(
-        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('awsSg', ?)",
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('awsSg', ?)"
       ).run(JSON.stringify(cfg.awsSg));
     }
     if (cfg.gitlab) {
       db.prepare(
-        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('gitlab', ?)",
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('gitlab', ?)"
       ).run(JSON.stringify(cfg.gitlab));
     }
     if (cfg.projects) {
       db.prepare(
-        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('projects', ?)",
+        "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('projects', ?)"
       ).run(JSON.stringify(cfg.projects));
     }
   });
@@ -251,7 +270,7 @@ try {
     }
     if (changed) {
       db.prepare(
-        "UPDATE app_config SET value_json = ? WHERE key = 'projects'",
+        "UPDATE app_config SET value_json = ? WHERE key = 'projects'"
       ).run(JSON.stringify(projects));
       console.log("Migrated projects config: added default params.");
     }

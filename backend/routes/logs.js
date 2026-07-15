@@ -39,10 +39,7 @@ module.exports = function attachLogs(httpServer) {
 
     if (!env || !container) {
       ws.send(
-        JSON.stringify({
-          type: "error",
-          message: "env and container required",
-        }),
+        JSON.stringify({ type: "error", message: "env and container required" })
       );
       return ws.close();
     }
@@ -52,7 +49,7 @@ module.exports = function attachLogs(httpServer) {
       .get(env);
     if (!server) {
       ws.send(
-        JSON.stringify({ type: "error", message: `Unknown env: ${env}` }),
+        JSON.stringify({ type: "error", message: `Unknown env: ${env}` })
       );
       return ws.close();
     }
@@ -136,17 +133,20 @@ module.exports = function attachLogs(httpServer) {
       (chunk) => send({ type: "chunk", text: chunk }),
       ({ status, exitCode }) => {
         const freshRun = db
-          .prepare("SELECT commits_json FROM build_runs WHERE id = ?")
+          .prepare(
+            "SELECT commits_json, pushed_images_json FROM build_runs WHERE id = ?"
+          )
           .get(runId);
         send({
           type: "done",
           status,
           exitCode,
           commits_json: freshRun?.commits_json || null,
+          pushed_images_json: freshRun?.pushed_images_json || null,
         });
         ws.close();
       },
-      () => send({ type: "stuck_alert" }),
+      () => send({ type: "stuck_alert" })
     );
 
     ws.on("close", unsub);
@@ -182,7 +182,7 @@ module.exports = function attachLogs(httpServer) {
       ({ status, exitCode }) => {
         send({ type: "done", status, exitCode });
         ws.close();
-      },
+      }
     );
 
     ws.on("close", unsub);

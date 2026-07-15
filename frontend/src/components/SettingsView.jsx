@@ -5,6 +5,7 @@ import GitLabTab from "./settings/GitLabTab";
 import AwsTab from "./settings/AwsTab";
 import BuildProjectsTab from "./settings/BuildProjectsTab";
 import FlywayTab from "./settings/FlywayTab";
+import CapRoverTab from "./settings/CapRoverTab";
 import { exportSettings, importSettings } from "../api";
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { id: "aws", label: "AWS", Component: AwsTab },
   { id: "buildProjects", label: "Build Projects", Component: BuildProjectsTab },
   { id: "flyway", label: "Flyway", Component: FlywayTab },
+  { id: "caprover", label: "CapRover", Component: CapRoverTab },
 ];
 
 export default function SettingsView() {
@@ -78,7 +80,9 @@ export default function SettingsView() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              className={`settings-tab-btn ${activeTab === t.id ? "active" : ""}`}
+              className={`settings-tab-btn ${
+                activeTab === t.id ? "active" : ""
+              }`}
               onClick={() => setActiveTab(t.id)}
             >
               {t.label}

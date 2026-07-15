@@ -9,8 +9,10 @@ const {
 const {
   startBuildRun,
   startCloneRun,
+  startCapRoverDeployRun,
   cancelRun,
 } = require("../services/build-manager");
+const { decryptField } = require("../encryption");
 const fs = require("fs");
 const path = require("path");
 
@@ -51,11 +53,11 @@ function writeAwsConfig() {
   fs.mkdirSync(awsDir, { recursive: true });
   fs.writeFileSync(
     `${awsDir}/credentials`,
-    `[default]\naws_access_key_id=${cfg.accessKeyId}\naws_secret_access_key=${cfg.secretAccessKey}\n`,
+    `[default]\naws_access_key_id=${cfg.accessKeyId}\naws_secret_access_key=${cfg.secretAccessKey}\n`
   );
   fs.writeFileSync(
     `${awsDir}/config`,
-    `[default]\nregion=${cfg.region || "us-east-1"}\n`,
+    `[default]\nregion=${cfg.region || "us-east-1"}\n`
   );
 }
 
@@ -95,7 +97,7 @@ router.post("/:project/clone", (req, res) => {
   const { runId, buildNumber } = startCloneRun(
     project,
     proj.repo,
-    getGitlabToken(),
+    getGitlabToken()
   );
   res.json({ runId, buildNumber });
 });
@@ -122,7 +124,7 @@ router.post("/:project", async (req, res) => {
     project,
     branch,
     args,
-    getAwsEnv(),
+    getAwsEnv()
   );
   res.json({ runId, buildNumber, queued });
 });
@@ -134,7 +136,7 @@ router.get("/:project/runs", (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
   const rows = db
     .prepare(
-      "SELECT id, project, build_number, type, status, exit_code, branch, args_json, commits_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+      "SELECT id, project, build_number, type, status, exit_code, branch, args_json, commits_json, pushed_images_json, started_at, finished_at FROM build_runs WHERE project = ? ORDER BY id DESC LIMIT ? OFFSET ?"
     )
     .all(project, limit + 1, offset);
   const hasMore = rows.length > limit;
@@ -149,6 +151,74 @@ router.get("/:project/runs/:num", (req, res) => {
     .get(project, parseInt(num, 10));
   if (!run) return res.status(404).json({ error: "Run not found" });
   res.json(run);
+});
+
+// POST /api/builds/:project/runs/:num/deploy-caprover — body: { targetId, imageName }
+// Deploys an image pushed by a successful build run to a configured CapRover target.
+router.post("/:project/runs/:num/deploy-caprover", (req, res) => {
+  const { project, num } = req.params;
+  const { targetId, imageName } = req.body;
+
+  const run = db
+    .prepare("SELECT * FROM build_runs WHERE project = ? AND build_number = ?")
+    .get(project, parseInt(num, 10));
+  if (!run) return res.status(404).json({ error: "Run not found" });
+  if (run.type !== "build" || run.status !== "success") {
+    return res
+      .status(400)
+      .json({ error: "Only successful build runs can be deployed" });
+  }
+
+  const pushedImages = (() => {
+    try {
+      return JSON.parse(run.pushed_images_json || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  if (pushedImages.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "This run recorded no pushed images" });
+  }
+  // imageName may be omitted when the run pushed exactly one image
+  const image =
+    imageName || (pushedImages.length === 1 ? pushedImages[0] : null);
+  if (!image)
+    return res.status(400).json({
+      error: "imageName is required — this run pushed multiple images",
+    });
+  if (!pushedImages.includes(image)) {
+    return res
+      .status(400)
+      .json({ error: "imageName was not pushed by this run" });
+  }
+
+  const target = db
+    .prepare("SELECT * FROM caprover_targets WHERE id = ? AND project = ?")
+    .get(targetId, project);
+  if (!target)
+    return res
+      .status(404)
+      .json({ error: "CapRover target not found for this project" });
+
+  const commits = (() => {
+    try {
+      return JSON.parse(run.commits_json || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const gitHash = commits[0]?.hash || "";
+
+  const { runId, buildNumber } = startCapRoverDeployRun(
+    project,
+    { ...target, app_token: decryptField(target.app_token) },
+    image,
+    gitHash,
+    run
+  );
+  res.json({ runId, buildNumber });
 });
 
 // POST /api/builds/:project/runs/:num/replay — re-run with identical params
@@ -173,7 +243,7 @@ router.post("/:project/runs/:num/replay", (req, res) => {
     project,
     run.branch,
     args,
-    getAwsEnv(),
+    getAwsEnv()
   );
   res.json({ runId, buildNumber, queued });
 });
