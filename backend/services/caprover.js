@@ -42,8 +42,9 @@ async function capFetch(url, appToken, options = {}) {
   } catch {
     throw new Error(`CapRover returned non-JSON response (HTTP ${res.status})`);
   }
-  // CapRover wraps everything in { status, description, data } — status 100 = OK.
-  if (body.status !== 100) {
+  // CapRover wraps everything in { status, description, data } —
+  // 100 = OK, 101 = OK deploy started (the expected answer to a detached deploy).
+  if (body.status !== 100 && body.status !== 101) {
     throw new Error(
       `CapRover error ${body.status}: ${body.description || "unknown error"}`,
     );

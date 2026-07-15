@@ -86,6 +86,10 @@ export default function CapRoverTab() {
         app_token,
         id: editId || undefined,
       });
+      if (r.ok === false) {
+        setError(`Test failed: ${r.error}`);
+        return;
+      }
       setTestResult(
         `✓ Connected — app '${r.appName}' found` +
           (r.instanceCount !== null
@@ -93,11 +97,7 @@ export default function CapRoverTab() {
             : ""),
       );
     } catch (err) {
-      let msg = err.message;
-      try {
-        msg = JSON.parse(err.message).error || msg;
-      } catch {}
-      setError(`Test failed: ${msg}`);
+      setError(`Test failed: ${err.message}`);
     } finally {
       setTesting(false);
     }

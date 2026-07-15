@@ -233,7 +233,9 @@ router.post("/caprover-targets/test", async (req, res) => {
     });
     res.json(result);
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    // Deliberately 200: proxies like Cloudflare replace origin 5xx bodies with
+    // their own error page, which would swallow the real failure reason.
+    res.json({ ok: false, error: err.message });
   }
 });
 

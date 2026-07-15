@@ -1,5 +1,22 @@
 const BASE = "/api";
 
+// Builds a readable Error from a failed response. JSON {error} bodies pass
+// through; HTML bodies (proxy/Cloudflare error pages, Express default 404s)
+// are collapsed to a short status line instead of dumping page source.
+async function readError(r) {
+  const text = await r.text();
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.error) return new Error(parsed.error);
+  } catch {}
+  if (/^\s*</.test(text)) {
+    return new Error(
+      `HTTP ${r.status} — the server returned an error page instead of a response (backend down or unreachable?)`,
+    );
+  }
+  return new Error(text.slice(0, 300) || `HTTP ${r.status}`);
+}
+
 export async function fetchContainers(env) {
   const r = await fetch(`${BASE}/servers/${env}/containers`);
   if (!r.ok) throw new Error(await r.text());
@@ -285,14 +302,16 @@ export async function updateCapRoverTarget(id, body) {
   return r.json();
 }
 
-// Validate a CapRover target's URL/app/token without saving it
+// Validate a CapRover target's URL/app/token without saving it.
+// Test failures come back as 200 { ok: false, error } — proxies like
+// Cloudflare replace origin 5xx bodies with their own error page.
 export async function testCapRoverTarget(body) {
   const r = await fetch(`${BASE}/settings/caprover-targets/test`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -319,7 +338,7 @@ export async function deployRunToCapRover(
       body: JSON.stringify({ targetId, imageName }),
     },
   );
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
