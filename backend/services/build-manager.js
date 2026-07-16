@@ -26,6 +26,10 @@ const activeProcesses = new Map();
 // maps to 'cancelled' rather than 'failed', avoiding a double-finishRun race.
 const cancelledRuns = new Set();
 
+// runId → AbortController for CapRover deploy runs, which have no OS process —
+// cancelling aborts the status-watch loop instead.
+const deployAborters = new Map();
+
 // Global build queue — only one build runs at a time.
 const buildQueue = []; // [{ project, branch, args, awsEnv, runId, buildNumber }]
 let buildRunning = false;
@@ -227,9 +231,12 @@ function startCapRoverDeployRun(
     );
   const runId = info.lastInsertRowid;
 
-  // Placeholder so cancelRun/finishRun treat it as active (no OS process to kill —
-  // cancelling only marks the run; the HTTP deploy continues server-side on CapRover).
+  // Placeholder so cancelRun/finishRun treat it as active. There is no OS
+  // process to kill — cancelling aborts the watch loop via deployAborters
+  // (the deploy itself continues server-side on CapRover).
   activeProcesses.set(runId, null);
+  const aborter = new AbortController();
+  deployAborters.set(runId, aborter);
   console.log(
     `[DEPLOY] Starting CapRover deploy #${buildNumber} for ${project} — ${imageName} → ${target.app_name} (${target.env_key})`
   );
@@ -248,13 +255,18 @@ function startCapRoverDeployRun(
     appToken: target.app_token,
     imageName,
     gitHash,
+    signal: aborter.signal,
     onLog: (chunk) => appendLog(runId, chunk),
   })
     .then(() => finishRun(runId, 0))
     .catch((err) => {
-      appendLog(runId, `ERROR: ${err.message}\n`);
+      // Cancellation already logged "[Cancelled by user]" — no ERROR line.
+      if (err.name !== "AbortError") {
+        appendLog(runId, `ERROR: ${err.message}\n`);
+      }
       finishRun(runId, 1);
-    });
+    })
+    .finally(() => deployAborters.delete(runId));
 
   return { runId, buildNumber };
 }
@@ -304,6 +316,11 @@ function cancelRun(runId) {
   const proc = activeProcesses.get(runId);
   cancelledRuns.add(runId);
   appendLog(runId, "\n[Cancelled by user]\n");
+  const aborter = deployAborters.get(runId);
+  if (aborter) {
+    aborter.abort();
+    return true;
+  }
   if (proc) {
     try {
       process.kill(-proc.pid, "SIGTERM");

@@ -91,10 +91,14 @@ export default function CapRoverTab() {
         return;
       }
       setTestResult(
-        `✓ Connected — app '${r.appName}' found` +
-          (r.instanceCount !== null
-            ? ` (${r.instanceCount} instance${r.instanceCount === 1 ? "" : "s"})`
-            : ""),
+        r.warning
+          ? `✓ ${r.warning}`
+          : `✓ Connected — app '${r.appName}' found` +
+              (r.instanceCount !== null
+                ? ` (${r.instanceCount} instance${
+                    r.instanceCount === 1 ? "" : "s"
+                  })`
+                : "")
       );
     } catch (err) {
       setError(`Test failed: ${err.message}`);
