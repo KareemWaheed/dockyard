@@ -104,13 +104,35 @@ router.get('/:env/containers', async (req, res) => {
   }
 });
 
-// POST /api/servers/restart-vpn
-// Runs daemon-reload + restart fortivpn locally on the backend machine, streams output
-router.post('/restart-vpn', (req, res) => {
+// GET /api/servers/vpn-status
+// Checks the fortivpn service state on the host machine
+router.get('/vpn-status', (req, res) => {
+  const proc = spawn('bash', ['-c', 'nsenter -t 1 -m -u -n -i -- systemctl is-active fortivpn']);
+  let out = '';
+  proc.stdout.on('data', (d) => { out += d; });
+  proc.stderr.on('data', (d) => { out += d; });
+  proc.on('close', () => {
+    const status = out.trim() || 'unknown';
+    res.json({ status, active: status === 'active' });
+  });
+});
+
+// POST /api/servers/vpn/:action
+// Runs start/stop/restart on the fortivpn service locally on the backend machine, streams output
+const VPN_COMMANDS = {
+  start: 'nsenter -t 1 -m -u -n -i -- systemctl daemon-reload && nsenter -t 1 -m -u -n -i -- systemctl start fortivpn',
+  stop: 'nsenter -t 1 -m -u -n -i -- systemctl stop fortivpn',
+  restart: 'nsenter -t 1 -m -u -n -i -- systemctl daemon-reload && nsenter -t 1 -m -u -n -i -- systemctl restart fortivpn',
+};
+
+router.post('/vpn/:action', (req, res) => {
+  const cmd = VPN_COMMANDS[req.params.action];
+  if (!cmd) return res.status(400).json({ error: `Unknown VPN action: ${req.params.action}` });
+
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  const proc = spawn('bash', ['-c', 'nsenter -t 1 -m -u -n -i -- systemctl daemon-reload && nsenter -t 1 -m -u -n -i -- systemctl restart fortivpn']);
+  const proc = spawn('bash', ['-c', cmd]);
 
   proc.stdout.on('data', (d) => res.write(d));
   proc.stderr.on('data', (d) => res.write(d));

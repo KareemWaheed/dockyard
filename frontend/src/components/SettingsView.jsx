@@ -6,6 +6,7 @@ import AwsTab from "./settings/AwsTab";
 import BuildProjectsTab from "./settings/BuildProjectsTab";
 import FlywayTab from "./settings/FlywayTab";
 import CapRoverTab from "./settings/CapRoverTab";
+import VpnTab from "./settings/VpnTab";
 import { exportSettings, importSettings } from "../api";
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { id: "buildProjects", label: "Build Projects", Component: BuildProjectsTab },
   { id: "flyway", label: "Flyway", Component: FlywayTab },
   { id: "caprover", label: "CapRover", Component: CapRoverTab },
+  { id: "vpn", label: "FortiVPN", Component: VpnTab },
 ];
 
 export default function SettingsView() {

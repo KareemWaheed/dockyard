@@ -108,9 +108,16 @@ export async function replayBuildRun(project, buildNumber) {
   return r.json();
 }
 
-// Streams VPN restart output (runs locally on the backend machine)
-export async function restartVpn(onChunk, onDone) {
-  const r = await fetch(`${BASE}/servers/restart-vpn`, { method: "POST" });
+// FortiVPN service state on the backend host machine
+export async function getVpnStatus() {
+  const r = await fetch(`${BASE}/servers/vpn-status`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// Streams VPN start/stop/restart output (runs locally on the backend machine)
+export async function vpnAction(action, onChunk, onDone) {
+  const r = await fetch(`${BASE}/servers/vpn/${action}`, { method: "POST" });
   if (!r.ok) {
     const err = await r.text();
     onChunk(`ERROR: ${err}\n`);
@@ -119,6 +126,9 @@ export async function restartVpn(onChunk, onDone) {
   }
   await streamWithSentinel(r, onChunk, onDone);
 }
+
+export const restartVpn = (onChunk, onDone) =>
+  vpnAction("restart", onChunk, onDone);
 
 // Streams whitelist output
 export async function whitelistIp(env, onChunk, onDone) {
