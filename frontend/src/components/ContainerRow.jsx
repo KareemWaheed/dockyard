@@ -54,13 +54,13 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
         {imageBase}:<b style={{ color: status === 'running' ? 'var(--green)' : 'var(--red)' }}>{imageTag}</b>
       </span>
 
-      {container.versionInfo && (
+      {container.hasVersionInfo && (
         <button
           className="container-version-badge"
-          title="Click for full build info"
+          title="Click for build info"
           onClick={() => setVersionInfoOpen(true)}
         >
-          {container.versionInfo.shortCommit}{container.versionInfo.dirty ? '*' : ''}
+          Build Info
         </button>
       )}
 
@@ -95,7 +95,7 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
       {logsOpen && <LogsPanel env={env} container={name} onClose={() => setLogsOpen(false)} />}
       {envOpen  && <EnvPanel  env={env} container={container} stackPath={stackPath} onClose={() => setEnvOpen(false)}  onDone={onRefresh} />}
       {tagOpen  && <UpdateTagModal env={env} container={container} stackPath={stackPath} onClose={() => setTagOpen(false)} onDone={onRefresh} />}
-      {versionInfoOpen && <VersionInfoModal container={container} onClose={() => setVersionInfoOpen(false)} />}
+      {versionInfoOpen && <VersionInfoModal env={env} container={container} stackPath={stackPath} onClose={() => setVersionInfoOpen(false)} />}
     </div>
   );
 }

@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { spawn } = require('child_process');
 const db = require('../db');
 const { connect, exec } = require('../services/ssh');
-const { parseComposePs, parseBatchInspect, parseVersionInfo } = require('../services/docker');
+const { parseComposePs, parseBatchInspect } = require('../services/docker');
 const { getNote } = require('../notes');
 const { decryptField } = require('../encryption');
 
@@ -52,23 +52,18 @@ router.get('/:env/containers', async (req, res) => {
       let versionInfoCfg = {};
       try { versionInfoCfg = JSON.parse(stack.version_info_json || '{}'); } catch {}
 
-      const enriched = await Promise.all(containers.map(async c => {
+      // Version info is fetched lazily (on-demand, see POST /:env/:containerName/version-info)
+      // rather than on every poll — it rarely changes and an extra `exec` per configured
+      // service on every 30s refresh doesn't pay for itself.
+      const enriched = containers.map(c => {
         const info = inspectMap[c.name];
         const base = info
           ? { ...c, ...info, note: getNote(env, c.name), stackPath: stack.path, stackName: stack.name }
           : { ...c, managed: false, env: {}, note: '', stackPath: stack.path, stackName: stack.name };
 
-        const vi = versionInfoCfg[c.serviceName];
-        if (vi?.path && base.status === 'running') {
-          try {
-            const raw = await exec(conn, `${dc} -f "${stack.path}" exec -T "${c.serviceName}" cat "${vi.path}"`);
-            base.versionInfo = parseVersionInfo(raw, vi.format);
-          } catch {
-            // container may not have the file yet, or exec failed — leave versionInfo unset
-          }
-        }
+        if (versionInfoCfg[c.serviceName]?.path) base.hasVersionInfo = true;
         return base;
-      }));
+      });
 
       result.push({ name: stack.name, path: stack.path, containers: enriched });
     }

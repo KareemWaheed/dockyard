@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
 const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose } = require('../services/compose');
+const { parseVersionInfo } = require('../services/docker');
 const { setNote } = require('../notes');
 const { getNote } = require('../notes');
 const { writeHistory } = require('../services/history');
@@ -249,6 +250,31 @@ router.post('/:env/:containerName/note', async (req, res) => {
   const { note } = req.body;
   setNote(env, containerName, note);
   res.json({ ok: true });
+});
+
+// Fetched on demand (badge click), not on every container-list poll — see
+// note in routes/servers.js on why this isn't baked into GET /containers.
+router.post('/:env/:containerName/version-info', async (req, res) => {
+  const { env } = req.params;
+  const { stackPath, serviceName } = req.body;
+  const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
+
+  const stack = db.prepare('SELECT * FROM compose_stacks WHERE server_id = ? AND path = ?').get(server.id, stackPath);
+  let versionInfoCfg = {};
+  try { versionInfoCfg = JSON.parse(stack?.version_info_json || '{}'); } catch {}
+  const vi = versionInfoCfg[serviceName];
+  if (!vi?.path) return res.status(404).json({ error: 'No version info configured for this service' });
+
+  const serverCfg = getServerConfig(server);
+  const dc = server.docker_compose_cmd || 'docker compose';
+  try {
+    const conn = await connect(env, serverCfg);
+    const raw = await exec(conn, `${dc} -f "${stackPath}" exec -T "${serviceName}" cat "${vi.path}"`);
+    res.json(parseVersionInfo(raw, vi.format));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

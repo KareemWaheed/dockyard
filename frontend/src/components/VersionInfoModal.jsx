@@ -1,17 +1,27 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from './UpdateTagModal';
+import { containerAction } from '../api';
 
-export default function VersionInfoModal({ container, onClose }) {
-  const vi = container.versionInfo || {};
-  // `raw` is every key/value actually present in the source file (git.properties
-  // or build-info.json) — shows the full contents, not just the curated fields.
-  const entries = Object.entries(vi.raw || {});
-  const dirty = vi.dirty === true || vi.dirty === 'true';
+export default function VersionInfoModal({ env, container, stackPath, onClose }) {
+  const [vi, setVi] = useState(null);
+  const [error, setError] = useState('');
+  const serviceName = container.serviceName || container.name;
+
+  useEffect(() => {
+    containerAction(env, container.name, 'version-info', { stackPath, serviceName })
+      .then(setVi)
+      .catch(e => setError(e.message));
+  }, [env, container.name, stackPath, serviceName]);
+
+  const entries = Object.entries(vi?.raw || {});
+  const dirty = vi?.dirty === true || vi?.dirty === 'true';
 
   return (
     <Modal title={`Build Info — ${container.name}`} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '60vh', overflow: 'auto' }}>
-        {entries.length === 0 && (
+        {error && <span style={{ fontSize: 11, color: 'var(--red)' }}>{error}</span>}
+        {!error && !vi && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Loading…</span>}
+        {!error && vi && entries.length === 0 && (
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No build info fields found.</span>
         )}
         {entries.map(([key, value]) => {
