@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChange, envStatuses, envs, open }) {
 
   const totalConnected = Object.values(envStatuses).filter(s => s !== 'loading' && s !== 'unknown').length;
   const allHealthy = Object.values(envStatuses).every(s => s === 'healthy');
+
+  const [buildInfo, setBuildInfo] = useState(null);
+  useEffect(() => {
+    fetch('/build-info.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(setBuildInfo)
+      .catch(() => {});
+  }, []);
 
   return (
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -61,6 +69,14 @@ export default function Sidebar({ activeEnv, activeView, onEnvChange, onViewChan
         <div style={{ color: allHealthy ? 'var(--green)' : 'var(--red)', marginTop: 3 }}>
           {allHealthy ? '● all healthy' : '● issues detected'}
         </div>
+        {buildInfo?.shortCommit && buildInfo.shortCommit !== 'unknown' && (
+          <div
+            className="sidebar-build-info"
+            title={`Branch: ${buildInfo.branch}\nCommit: ${buildInfo.commit}\nBuilt: ${buildInfo.buildTime}`}
+          >
+            build {buildInfo.shortCommit}
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -26,5 +26,8 @@ jobs:
           context: .
           push: true
           tags: kareemwaheed/dockyard:latest
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

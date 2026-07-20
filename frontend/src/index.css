@@ -133,6 +133,11 @@ body {
   font-size: 9px;
   color: var(--text-dim);
 }
+.sidebar-build-info {
+  margin-top: 3px;
+  font-family: monospace;
+  cursor: default;
+}
 
 .status-dot {
   width: 5px;
