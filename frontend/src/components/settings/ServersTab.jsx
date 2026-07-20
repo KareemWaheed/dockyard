@@ -6,8 +6,15 @@ const EMPTY_FORM = {
   auth_method: 'password', ssh_password: '', ssh_key_path: '', ssh_key_content: '',
   ssh_passphrase: '', docker_compose_cmd: 'docker compose', aws_sg_id: '',
   maintenance_flag_path: '',
-  stacks: [{ name: '', path: '' }],
+  stacks: [{ name: '', path: '', versionInfo: [] }],
 };
+
+// versionInfo is stored server-side as a { [serviceName]: { path, format } } map;
+// the form edits it as an array of rows for easier add/remove UI.
+const versionInfoMapToRows = (vi) =>
+  Object.entries(vi || {}).map(([serviceName, v]) => ({ serviceName, path: v.path, format: v.format || 'properties' }));
+const versionInfoRowsToMap = (rows) =>
+  Object.fromEntries((rows || []).filter(r => r.serviceName && r.path).map(r => [r.serviceName, { path: r.path, format: r.format }]));
 
 export default function ServersTab() {
   const [servers, setServers] = useState([]);
@@ -18,7 +25,7 @@ export default function ServersTab() {
   const load = () => fetchSettingsServers().then(setServers);
   useEffect(() => { load(); }, []);
 
-  const openAdd = () => { setEditId(null); setForm({ ...EMPTY_FORM, stacks: [{ name: '', path: '' }] }); };
+  const openAdd = () => { setEditId(null); setForm({ ...EMPTY_FORM, stacks: [{ name: '', path: '', versionInfo: [] }] }); };
   const openEdit = (s) => {
     setEditId(s.id);
     setForm({
@@ -28,7 +35,9 @@ export default function ServersTab() {
       ssh_key_content: s.ssh_key_content || '', ssh_passphrase: s.ssh_passphrase || '',
       docker_compose_cmd: s.docker_compose_cmd || 'docker compose', aws_sg_id: s.aws_sg_id || '',
       maintenance_flag_path: s.maintenance_flag_path || '',
-      stacks: s.stacks.length ? s.stacks.map(st => ({ name: st.name, path: st.path })) : [{ name: '', path: '' }],
+      stacks: s.stacks.length
+        ? s.stacks.map(st => ({ name: st.name, path: st.path, versionInfo: versionInfoMapToRows(st.versionInfo) }))
+        : [{ name: '', path: '', versionInfo: [] }],
     });
   };
   const cancel = () => setForm(null);
@@ -43,7 +52,9 @@ export default function ServersTab() {
       docker_compose_cmd: form.docker_compose_cmd,
       aws_sg_id: form.aws_sg_id || null,
       maintenance_flag_path: form.maintenance_flag_path || null,
-      stacks: form.stacks.filter(s => s.name && s.path),
+      stacks: form.stacks.filter(s => s.name && s.path).map(s => ({
+        name: s.name, path: s.path, versionInfo: versionInfoRowsToMap(s.versionInfo),
+      })),
     };
     if (editId) await updateSettingsServer(editId, body);
     else await createSettingsServer(body);
@@ -63,8 +74,26 @@ export default function ServersTab() {
     stacks[i] = { ...stacks[i], [k]: v };
     return { ...f, stacks };
   });
-  const addStack = () => setForm(f => ({ ...f, stacks: [...f.stacks, { name: '', path: '' }] }));
+  const addStack = () => setForm(f => ({ ...f, stacks: [...f.stacks, { name: '', path: '', versionInfo: [] }] }));
   const removeStack = (i) => setForm(f => ({ ...f, stacks: f.stacks.filter((_, idx) => idx !== i) }));
+
+  const setVersionInfoRow = (stackIdx, rowIdx, k, v) => setForm(f => {
+    const stacks = [...f.stacks];
+    const versionInfo = [...(stacks[stackIdx].versionInfo || [])];
+    versionInfo[rowIdx] = { ...versionInfo[rowIdx], [k]: v };
+    stacks[stackIdx] = { ...stacks[stackIdx], versionInfo };
+    return { ...f, stacks };
+  });
+  const addVersionInfoRow = (stackIdx) => setForm(f => {
+    const stacks = [...f.stacks];
+    stacks[stackIdx] = { ...stacks[stackIdx], versionInfo: [...(stacks[stackIdx].versionInfo || []), { serviceName: '', path: '', format: 'properties' }] };
+    return { ...f, stacks };
+  });
+  const removeVersionInfoRow = (stackIdx, rowIdx) => setForm(f => {
+    const stacks = [...f.stacks];
+    stacks[stackIdx] = { ...stacks[stackIdx], versionInfo: stacks[stackIdx].versionInfo.filter((_, idx) => idx !== rowIdx) };
+    return { ...f, stacks };
+  });
 
   return (
     <div className="settings-tab">
@@ -138,10 +167,29 @@ export default function ServersTab() {
                 <button onClick={addStack}>+ Add Stack</button>
               </div>
               {form.stacks.map((st, i) => (
-                <div key={i} className="settings-stack-input-row">
-                  <input placeholder="Name (e.g. Main)" value={st.name} onChange={e => setStack(i, 'name', e.target.value)} />
-                  <input placeholder="Path (e.g. /app/docker-compose.yml)" value={st.path} onChange={e => setStack(i, 'path', e.target.value)} />
-                  <button onClick={() => removeStack(i)}>✕</button>
+                <div key={i} className="settings-stack-block">
+                  <div className="settings-stack-input-row">
+                    <input placeholder="Name (e.g. Main)" value={st.name} onChange={e => setStack(i, 'name', e.target.value)} />
+                    <input placeholder="Path (e.g. /app/docker-compose.yml)" value={st.path} onChange={e => setStack(i, 'path', e.target.value)} />
+                    <button onClick={() => removeStack(i)}>✕</button>
+                  </div>
+                  <div className="settings-version-info-editor">
+                    <div className="settings-stacks-header">
+                      <span>Version Info (optional — per service build metadata)</span>
+                      <button onClick={() => addVersionInfoRow(i)}>+ Add Service</button>
+                    </div>
+                    {(st.versionInfo || []).map((vi, j) => (
+                      <div key={j} className="settings-stack-input-row">
+                        <input placeholder="Service name (e.g. backend)" value={vi.serviceName} onChange={e => setVersionInfoRow(i, j, 'serviceName', e.target.value)} />
+                        <input placeholder="Path in container (e.g. /app/resources/git.properties)" value={vi.path} onChange={e => setVersionInfoRow(i, j, 'path', e.target.value)} />
+                        <select value={vi.format} onChange={e => setVersionInfoRow(i, j, 'format', e.target.value)}>
+                          <option value="properties">properties</option>
+                          <option value="json">json</option>
+                        </select>
+                        <button onClick={() => removeVersionInfoRow(i, j)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

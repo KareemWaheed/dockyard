@@ -16,7 +16,13 @@ router.get("/servers", (req, res) => {
     ssh_password: decryptField(s.ssh_password),
     ssh_key_content: decryptField(s.ssh_key_content),
     ssh_passphrase: decryptField(s.ssh_passphrase),
-    stacks: stacks.filter((st) => st.server_id === s.id),
+    stacks: stacks
+      .filter((st) => st.server_id === s.id)
+      .map((st) => {
+        let versionInfo = {};
+        try { versionInfo = JSON.parse(st.version_info_json || "{}"); } catch {}
+        return { ...st, versionInfo };
+      }),
   }));
   res.json(result);
 });
@@ -61,8 +67,8 @@ router.post("/servers", (req, res) => {
   const serverId = info.lastInsertRowid;
   for (const stack of stacks || []) {
     db.prepare(
-      "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
-    ).run(serverId, stack.name, stack.path);
+      "INSERT INTO compose_stacks (server_id, name, path, version_info_json) VALUES (?, ?, ?, ?)",
+    ).run(serverId, stack.name, stack.path, JSON.stringify(stack.versionInfo || {}));
   }
   res.json({ id: serverId });
 });
@@ -106,8 +112,8 @@ router.put("/servers/:id", (req, res) => {
     db.prepare("DELETE FROM compose_stacks WHERE server_id = ?").run(id);
     for (const stack of stacks) {
       db.prepare(
-        "INSERT INTO compose_stacks (server_id, name, path) VALUES (?, ?, ?)",
-      ).run(id, stack.name, stack.path);
+        "INSERT INTO compose_stacks (server_id, name, path, version_info_json) VALUES (?, ?, ?, ?)",
+      ).run(id, stack.name, stack.path, JSON.stringify(stack.versionInfo || {}));
     }
   }
   // Drop cached SSH connection so next request reconnects

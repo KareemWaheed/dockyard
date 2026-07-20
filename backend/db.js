@@ -236,6 +236,12 @@ try {
   db.exec("ALTER TABLE servers ADD COLUMN maintenance_flag_path TEXT");
 } catch {}
 
+// Per-stack build/version metadata sources — JSON map of
+// { [serviceName]: { path, format: 'properties'|'json' } }
+try {
+  db.exec("ALTER TABLE compose_stacks ADD COLUMN version_info_json TEXT DEFAULT '{}'");
+} catch {}
+
 // Ensure projects have params arrays (migration for pre-params configs)
 try {
   const row = db

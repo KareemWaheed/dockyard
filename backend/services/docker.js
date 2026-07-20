@@ -64,4 +64,38 @@ function parseBatchInspect(output) {
   return map;
 }
 
-module.exports = { parseComposePs, parseInspect, parseBatchInspect };
+// Normalizes a Java .properties-style git.properties file or a build-info.json
+// file into a common shape for display.
+function parseVersionInfo(raw, format) {
+  if (format === 'json') {
+    const data = JSON.parse(raw);
+    return {
+      version: data.version || '',
+      commit: data.commit || '',
+      shortCommit: data.shortCommit || (data.commit ? data.commit.slice(0, 7) : ''),
+      branch: data.branch || '',
+      dirty: !!data.dirty,
+      buildTime: data.buildTime || '',
+    };
+  }
+
+  const props = {};
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx === -1) continue;
+    props[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim().replace(/\\(.)/g, '$1');
+  }
+  const commit = props['git.commit.id'] || '';
+  return {
+    version: (props['git.tags'] || '').replace(/^v/, ''),
+    commit,
+    shortCommit: props['git.commit.id.abbrev'] || commit.slice(0, 7),
+    branch: props['git.branch'] || '',
+    dirty: props['git.dirty'] === 'true',
+    buildTime: props['git.build.time'] || '',
+  };
+}
+
+module.exports = { parseComposePs, parseInspect, parseBatchInspect, parseVersionInfo };

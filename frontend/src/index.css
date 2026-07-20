@@ -345,6 +345,17 @@ input:focus, select:focus, textarea:focus {
   text-overflow: ellipsis;
 }
 
+.container-version-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: default;
+}
+
 .container-note {
   flex: 1;
   max-width: 180px;
@@ -958,6 +969,8 @@ input:focus, select:focus, textarea:focus {
 .settings-stack-row { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); }
 .settings-stack-row code { font-family: monospace; }
 .settings-stacks-editor { display: flex; flex-direction: column; gap: 6px; }
+.settings-stack-block { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.settings-version-info-editor { display: flex; flex-direction: column; gap: 6px; padding-left: 16px; }
 .settings-stacks-header { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); }
 .settings-stacks-header button { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
 .settings-stacks-header button:hover { border-color: var(--blue); color: var(--text); }

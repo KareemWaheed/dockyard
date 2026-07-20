@@ -52,6 +52,15 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
         {imageBase}:<b style={{ color: status === 'running' ? 'var(--green)' : 'var(--red)' }}>{imageTag}</b>
       </span>
 
+      {container.versionInfo && (
+        <span
+          className="container-version-badge"
+          title={`Branch: ${container.versionInfo.branch}\nCommit: ${container.versionInfo.commit}\nBuild time: ${container.versionInfo.buildTime}\nDirty: ${container.versionInfo.dirty}`}
+        >
+          {container.versionInfo.shortCommit}{container.versionInfo.dirty ? '*' : ''}
+        </span>
+      )}
+
       <input
         className="container-note"
         value={localNote}
