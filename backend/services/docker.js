@@ -65,10 +65,12 @@ function parseBatchInspect(output) {
 }
 
 // Normalizes a Java .properties-style git.properties file or a build-info.json
-// file into a common shape for display.
-function parseVersionInfo(raw, format) {
+// file into a common shape for display, plus `raw` holding every key/value
+// actually present in the file (so the UI can show fields beyond the
+// curated set, e.g. extra properties a project adds).
+function parseVersionInfo(content, format) {
   if (format === 'json') {
-    const data = JSON.parse(raw);
+    const data = JSON.parse(content);
     return {
       version: data.version || '',
       commit: data.commit || '',
@@ -76,11 +78,12 @@ function parseVersionInfo(raw, format) {
       branch: data.branch || '',
       dirty: !!data.dirty,
       buildTime: data.buildTime || '',
+      raw: data,
     };
   }
 
   const props = {};
-  for (const line of raw.split('\n')) {
+  for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     const idx = trimmed.indexOf('=');
@@ -95,6 +98,7 @@ function parseVersionInfo(raw, format) {
     branch: props['git.branch'] || '',
     dirty: props['git.dirty'] === 'true',
     buildTime: props['git.build.time'] || '',
+    raw: props,
   };
 }
 

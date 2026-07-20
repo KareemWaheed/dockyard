@@ -3,6 +3,7 @@ import { containerAction, saveNote } from '../api';
 import LogsPanel from './LogsPanel';
 import EnvPanel from './EnvPanel';
 import UpdateTagModal from './UpdateTagModal';
+import VersionInfoModal from './VersionInfoModal';
 
 export default function ContainerRow({ env, container, stackPath, checked, onToggle, onRefresh }) {
   const { name, status, image, managed, note } = container;
@@ -10,6 +11,7 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
   const [logsOpen, setLogsOpen] = useState(false);
   const [envOpen, setEnvOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
+  const [versionInfoOpen, setVersionInfoOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const serviceName = container.serviceName || name;
 
@@ -53,12 +55,13 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
       </span>
 
       {container.versionInfo && (
-        <span
+        <button
           className="container-version-badge"
-          title={`Branch: ${container.versionInfo.branch}\nCommit: ${container.versionInfo.commit}\nBuild time: ${container.versionInfo.buildTime}\nDirty: ${container.versionInfo.dirty}`}
+          title="Click for full build info"
+          onClick={() => setVersionInfoOpen(true)}
         >
           {container.versionInfo.shortCommit}{container.versionInfo.dirty ? '*' : ''}
-        </span>
+        </button>
       )}
 
       <input
@@ -92,6 +95,7 @@ export default function ContainerRow({ env, container, stackPath, checked, onTog
       {logsOpen && <LogsPanel env={env} container={name} onClose={() => setLogsOpen(false)} />}
       {envOpen  && <EnvPanel  env={env} container={container} stackPath={stackPath} onClose={() => setEnvOpen(false)}  onDone={onRefresh} />}
       {tagOpen  && <UpdateTagModal env={env} container={container} stackPath={stackPath} onClose={() => setTagOpen(false)} onDone={onRefresh} />}
+      {versionInfoOpen && <VersionInfoModal container={container} onClose={() => setVersionInfoOpen(false)} />}
     </div>
   );
 }
