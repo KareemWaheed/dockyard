@@ -190,6 +190,19 @@ export default function BuildView() {
         setLiveLog((prev) => prev + msg.text);
       }
       if (msg.type === "stuck_alert") setStuckAlert(true);
+      if (msg.type === "meta") {
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.id === run.id
+              ? {
+                  ...r,
+                  commits_json: msg.commits_json ?? r.commits_json,
+                  branch: msg.branch ?? r.branch,
+                }
+              : r
+          )
+        );
+      }
       if (msg.type === "done") {
         setStuckAlert(false);
         setLiveStatus(msg.status);

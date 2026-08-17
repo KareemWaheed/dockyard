@@ -325,6 +325,27 @@ router.put("/config/:key", (req, res) => {
   db.prepare(
     "INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)",
   ).run(req.params.key, JSON.stringify(req.body));
+
+  if (req.params.key === "projects" && typeof req.body === "object" && req.body !== null) {
+    try {
+      const { setRemoteUrl, repoDir } = require("../services/git");
+      const fs = require("fs");
+      const gitlabRow = db.prepare("SELECT value_json FROM app_config WHERE key = 'gitlab'").get();
+      const token = gitlabRow ? JSON.parse(gitlabRow.value_json).token : "";
+      for (const [key, proj] of Object.entries(req.body)) {
+        if (proj.repo && fs.existsSync(repoDir(key))) {
+          try {
+            setRemoteUrl(key, proj.repo, token);
+          } catch (err) {
+            console.error(`Failed to sync git remote for project "${key}":`, err.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to sync project remotes on config save:", err.message);
+    }
+  }
+
   res.json({ ok: true });
 });
 

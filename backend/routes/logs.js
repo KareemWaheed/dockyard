@@ -121,9 +121,24 @@ module.exports = function attachLogs(httpServer) {
     // Replay existing log
     if (run.log) send({ type: "chunk", text: run.log });
 
+    // Send existing metadata if available
+    if (run.commits_json) {
+      send({
+        type: "meta",
+        commits_json: run.commits_json,
+        branch: run.branch,
+      });
+    }
+
     // If already finished (not running and not queued), send done immediately.
     if (run.status !== "running" && run.status !== "queued") {
-      send({ type: "done", status: run.status, exitCode: run.exit_code });
+      send({
+        type: "done",
+        status: run.status,
+        exitCode: run.exit_code,
+        commits_json: run.commits_json || null,
+        pushed_images_json: run.pushed_images_json || null,
+      });
       return ws.close();
     }
 
@@ -146,7 +161,8 @@ module.exports = function attachLogs(httpServer) {
         });
         ws.close();
       },
-      () => send({ type: "stuck_alert" })
+      () => send({ type: "stuck_alert" }),
+      (meta) => send({ type: "meta", ...meta })
     );
 
     ws.on("close", unsub);

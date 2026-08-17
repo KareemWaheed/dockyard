@@ -48,6 +48,22 @@ export async function fetchProjects() {
   return r.json();
 }
 
+export async function fetchProjectRemote(project) {
+  const r = await fetch(`${BASE}/builds/${project}/remote`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateProjectRemote(project, repoUrl) {
+  const r = await fetch(`${BASE}/builds/${project}/remote`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repoUrl }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function saveNote(env, containerName, note) {
   return containerAction(env, containerName, "note", { note });
 }

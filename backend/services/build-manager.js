@@ -150,10 +150,12 @@ function _runBuild(project, branch, args, awsEnv, runId, buildNumber) {
   }
 
   const commits = getRecentCommits(project);
+  const commitsJson = JSON.stringify(commits);
   db.prepare("UPDATE build_runs SET commits_json = ? WHERE id = ?").run(
-    JSON.stringify(commits),
+    commitsJson,
     runId
   );
+  emitter.emit(`run:${runId}:meta`, { commits_json: commitsJson, branch });
 
   appendLog(runId, `Running ${proj.buildScript}...\n`);
   activeProcesses.set(runId, null);
@@ -182,6 +184,7 @@ function startBuildRun(project, branch, args, awsEnv) {
     )
     .run(project, buildNumber, status, branch, JSON.stringify(args));
   const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
 
   if (buildRunning) {
     buildQueue.push({ project, branch, args, awsEnv, runId, buildNumber });
@@ -230,6 +233,7 @@ function startCapRoverDeployRun(
       })
     );
   const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
 
   // Placeholder so cancelRun/finishRun treat it as active. There is no OS
   // process to kill — cancelling aborts the watch loop via deployAborters
@@ -279,6 +283,7 @@ function startCloneRun(project, repoUrl, token) {
     )
     .run(project, buildNumber);
   const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
 
   appendLog(runId, `Cloning ${repoUrl}...\n`);
   activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
@@ -331,25 +336,29 @@ function cancelRun(runId) {
   return true;
 }
 
-function subscribeRun(runId, onChunk, onDone, onStuckAlert) {
+function subscribeRun(runId, onChunk, onDone, onStuckAlert, onMeta) {
   const chunkKey = `run:${runId}:chunk`;
   const doneKey = `run:${runId}:done`;
   const stuckKey = `run:${runId}:stuck_alert`;
+  const metaKey = `run:${runId}:meta`;
 
   const doneWrapper = (result) => {
     emitter.off(chunkKey, onChunk);
     if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
+    if (onMeta) emitter.off(metaKey, onMeta);
     onDone(result);
   };
 
   emitter.on(chunkKey, onChunk);
   emitter.once(doneKey, doneWrapper);
   if (onStuckAlert) emitter.on(stuckKey, onStuckAlert);
+  if (onMeta) emitter.on(metaKey, onMeta);
 
   return () => {
     emitter.off(chunkKey, onChunk);
     emitter.off(doneKey, doneWrapper);
     if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
+    if (onMeta) emitter.off(metaKey, onMeta);
   };
 }
 

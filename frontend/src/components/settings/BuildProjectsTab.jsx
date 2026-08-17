@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAppConfig, updateAppConfig } from '../../api';
+import { fetchAppConfig, updateAppConfig, fetchProjectRemote, updateProjectRemote } from '../../api';
 
 const PARAM_TYPES = ['string', 'select', 'checkbox', 'multiselect'];
 
@@ -17,6 +17,9 @@ export default function BuildProjectsTab() {
   const [activeKey, setActiveKey] = useState(null);
   const [newKey, setNewKey] = useState('');
   const [saved, setSaved] = useState(false);
+  const [remoteInfo, setRemoteInfo] = useState(null);
+  const [syncingRemote, setSyncingRemote] = useState(false);
+  const [remoteMsg, setRemoteMsg] = useState(null);
 
   useEffect(() => {
     fetchAppConfig('projects').then(data => {
@@ -26,6 +29,17 @@ export default function BuildProjectsTab() {
       if (k.length > 0) setActiveKey(k[0]);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!activeKey) {
+      setRemoteInfo(null);
+      return;
+    }
+    setRemoteMsg(null);
+    fetchProjectRemote(activeKey)
+      .then(setRemoteInfo)
+      .catch(() => setRemoteInfo(null));
+  }, [activeKey]);
 
   const proj = activeKey ? projects[activeKey] : null;
 
@@ -83,10 +97,33 @@ export default function BuildProjectsTab() {
     setActiveKey(k[0] || null);
   };
 
+  const handleSyncRemote = async () => {
+    if (!activeKey || !proj?.repo) return;
+    setSyncingRemote(true);
+    setRemoteMsg(null);
+    try {
+      const res = await updateProjectRemote(activeKey, proj.repo);
+      setRemoteInfo({
+        isCloned: true,
+        configuredUrl: res.repoUrl,
+        diskRemoteUrl: res.diskRemoteUrl,
+      });
+      setRemoteMsg({ type: 'success', text: 'Remote URL successfully updated and synced to cloned repo on disk!' });
+    } catch (err) {
+      setRemoteMsg({ type: 'error', text: err.message });
+    } finally {
+      setSyncingRemote(false);
+    }
+  };
+
   const save = async () => {
     await updateAppConfig('projects', projects);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    // Refresh remote info after save
+    if (activeKey) {
+      fetchProjectRemote(activeKey).then(setRemoteInfo).catch(() => {});
+    }
   };
 
   return (
@@ -122,6 +159,51 @@ export default function BuildProjectsTab() {
               <label>Build Script<input value={proj.buildScript || ''} onChange={e => updateProject('buildScript', e.target.value)} placeholder="my-build.sh" /></label>
               <button onClick={removeProject} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>Delete Project</button>
             </div>
+            {remoteInfo && (
+              <div style={{
+                fontSize: 12,
+                padding: '6px 10px',
+                borderRadius: 4,
+                background: 'var(--bg-card, rgba(255,255,255,0.03))',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Cloned Remote on Server:</span>
+                  {remoteInfo.isCloned ? (
+                    <code style={{ fontSize: 11, color: 'var(--text-accent, #38bdf8)' }}>{remoteInfo.diskRemoteUrl || '(none)'}</code>
+                  ) : (
+                    <span style={{ color: 'var(--text-dim, #888)' }}>Not cloned yet on server</span>
+                  )}
+                  {remoteInfo.isCloned && remoteInfo.diskRemoteUrl && proj.repo && remoteInfo.diskRemoteUrl !== proj.repo && (
+                    <span style={{ color: 'var(--yellow, #f59e0b)', fontSize: 11 }}>⚠ Differs from configured URL</span>
+                  )}
+                </div>
+                {remoteInfo.isCloned && (
+                  <button
+                    type="button"
+                    onClick={handleSyncRemote}
+                    disabled={syncingRemote || !proj.repo}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                  >
+                    {syncingRemote ? 'Syncing...' : 'Sync URL to Server Repo'}
+                  </button>
+                )}
+              </div>
+            )}
+            {remoteMsg && (
+              <div style={{
+                fontSize: 11,
+                color: remoteMsg.type === 'error' ? 'var(--red)' : 'var(--green)',
+                marginTop: -4,
+              }}>
+                {remoteMsg.text}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}>
                 <input

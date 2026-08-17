@@ -5,6 +5,8 @@ const {
   listBranches,
   repoDir,
   isSafeBranchName,
+  getRemoteUrl,
+  setRemoteUrl,
 } = require("../services/git");
 const {
   startBuildRun,
@@ -64,6 +66,51 @@ function writeAwsConfig() {
 // GET /api/builds/projects
 router.get("/projects", (req, res) => {
   res.json(getProjects());
+});
+
+// GET /api/builds/:project/remote — returns { isCloned, configuredUrl, diskRemoteUrl }
+router.get("/:project/remote", (req, res) => {
+  const { project } = req.params;
+  const proj = getProjects()[project];
+  if (!proj) return res.status(404).json({ error: "Project not found" });
+
+  const isCloned = fs.existsSync(repoDir(project));
+  const remote = isCloned ? getRemoteUrl(project) : null;
+  res.json({
+    isCloned,
+    configuredUrl: proj.repo || "",
+    diskRemoteUrl: remote?.cleanUrl || "",
+  });
+});
+
+// PUT /api/builds/:project/remote — body: { repoUrl }
+router.put("/:project/remote", (req, res) => {
+  const { project } = req.params;
+  const { repoUrl } = req.body;
+  if (!repoUrl) return res.status(400).json({ error: "repoUrl is required" });
+
+  const projects = getProjects();
+  const proj = projects[project];
+  if (!proj) return res.status(404).json({ error: "Project not found" });
+
+  projects[project] = { ...proj, repo: repoUrl };
+  db.prepare(
+    "INSERT OR REPLACE INTO app_config (key, value_json) VALUES ('projects', ?)"
+  ).run(JSON.stringify(projects));
+
+  let diskRemoteUrl = repoUrl;
+  if (fs.existsSync(repoDir(project))) {
+    try {
+      const updated = setRemoteUrl(project, repoUrl, getGitlabToken());
+      diskRemoteUrl = updated?.cleanUrl || repoUrl;
+    } catch (err) {
+      return res.status(500).json({
+        error: `Updated config, but failed to update git remote: ${err.message}`,
+      });
+    }
+  }
+
+  res.json({ ok: true, repoUrl, diskRemoteUrl });
 });
 
 // GET /api/builds/:project/branches
