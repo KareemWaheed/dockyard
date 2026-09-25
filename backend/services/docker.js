@@ -53,12 +53,19 @@ function parseBatchInspect(output) {
       const idx = e.indexOf('=');
       if (idx > -1) env[e.slice(0, idx)] = e.slice(idx + 1);
     }
+    const state = item.State || {};
+    const zeroTime = (t) => (!t || t.startsWith('0001-01-01') ? null : t);
     map[name] = {
       image: item.Config?.Image || '',
       managed: labels['com.dockyard.managed'] === 'true',
       env,
-      status: (item.State?.Status || '').toLowerCase().includes('running') ? 'running' : 'stopped',
+      status: (state.Status || '').toLowerCase().includes('running') ? 'running' : 'stopped',
       labels,
+      health: state.Health?.Status ?? null,
+      startedAt: zeroTime(state.StartedAt),
+      finishedAt: zeroTime(state.FinishedAt),
+      exitCode: typeof state.ExitCode === 'number' ? state.ExitCode : null,
+      restartCount: item.RestartCount ?? 0,
     };
   }
   return map;
