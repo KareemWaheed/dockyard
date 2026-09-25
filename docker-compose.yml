@@ -6,6 +6,9 @@ services:
     pid: host
     environment:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # Public URL(s) allowed to open WebSockets (logs/builds/flyway). Only needed
+      # if a proxy rewrites the Host header so it no longer matches the browser's Origin.
+      # - CORS_ORIGIN=https://dockyard.example.com
       # Minutes of silence before a build is flagged as possibly stuck (default: 15)
       # BUILD_STUCK_ALERT_MINUTES: 15
       # Minutes of silence before a build is auto-cancelled (default: 30)

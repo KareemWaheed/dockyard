@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const { allowedOrigins, rejectCrossSiteWrites } = require('./services/origin');
 
 // Must be first — initializes SQLite and runs migration if needed
 require('./db');
@@ -8,11 +9,8 @@ const { hydrateQueue } = require('./services/build-manager');
 hydrateQueue();
 
 const app = express();
-app.use(cors({
-  origin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-}));
+app.use(cors({ origin: allowedOrigins() }));
+app.use(rejectCrossSiteWrites);
 app.use(express.json());
 
 // Routes

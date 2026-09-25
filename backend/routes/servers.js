@@ -5,6 +5,7 @@ const { connect, exec } = require('../services/ssh');
 const { parseComposePs, parseBatchInspect } = require('../services/docker');
 const { getNote } = require('../notes');
 const { decryptField } = require('../encryption');
+const { shellQuote } = require('../services/shell');
 
 router.get('/:env/containers', async (req, res) => {
   const { env } = req.params;
@@ -35,13 +36,13 @@ router.get('/:env/containers', async (req, res) => {
     const result = [];
 
     for (const stack of stacks) {
-      const psOutput = await exec(conn, `${dc} -f "${stack.path}" ps --all --format json`);
+      const psOutput = await exec(conn, `${dc} -f ${shellQuote(stack.path)} ps --all --format json`);
       const containers = parseComposePs(psOutput);
 
       let inspectMap = {};
       if (containers.length) {
         try {
-          const names = containers.map(c => `"${c.name}"`).join(' ');
+          const names = containers.map(c => shellQuote(c.name)).join(' ');
           const inspectOutput = await exec(conn, `docker inspect ${names}`);
           inspectMap = parseBatchInspect(inspectOutput);
         } catch {
@@ -85,7 +86,7 @@ router.get('/:env/containers', async (req, res) => {
       const standaloneNames = allNames.filter(n => !composeNames.has(n));
 
       if (standaloneNames.length) {
-        const names = standaloneNames.map(n => `"${n}"`).join(' ');
+        const names = standaloneNames.map(n => shellQuote(n)).join(' ');
         try {
           const inspectOutput = await exec(conn, `docker inspect ${names}`);
           const inspectMap = parseBatchInspect(inspectOutput);

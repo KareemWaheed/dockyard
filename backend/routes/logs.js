@@ -6,12 +6,17 @@ const {
   subscribeRun: subscribeFlywayRun,
 } = require("../services/flyway-manager");
 const { decryptField } = require("../encryption");
+const { shellQuote, isValidName } = require("../services/shell");
+const { isAllowedOrigin } = require("../services/origin");
 
 module.exports = function attachLogs(httpServer) {
   // Single WSS instance — ws@8.x aborts the socket if a path-filtered WSS
   // doesn't match, preventing a second WSS from ever receiving the upgrade.
   // Route manually instead.
-  const wss = new WebSocketServer({ server: httpServer });
+  const wss = new WebSocketServer({
+    server: httpServer,
+    verifyClient: ({ req }) => isAllowedOrigin(req),
+  });
 
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url, "http://localhost");
@@ -43,6 +48,10 @@ module.exports = function attachLogs(httpServer) {
       );
       return ws.close();
     }
+    if (!isValidName(container)) {
+      ws.send(JSON.stringify({ type: "error", message: "Invalid container name" }));
+      return ws.close();
+    }
 
     const server = db
       .prepare("SELECT * FROM servers WHERE env_key = ?")
@@ -69,7 +78,7 @@ module.exports = function attachLogs(httpServer) {
     let stream;
     try {
       const conn = await connect(env, serverCfg);
-      conn.exec(`docker logs --tail=200 -f ${container}`, (err, s) => {
+      conn.exec(`docker logs --tail=200 -f ${shellQuote(container)}`, (err, s) => {
         if (err) {
           ws.send(JSON.stringify({ type: "error", message: err.message }));
           return ws.close();

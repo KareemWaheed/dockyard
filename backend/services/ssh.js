@@ -1,6 +1,7 @@
 const { Client } = require('ssh2');
 const fs = require('fs');
 const path = require('path');
+const { shellQuote } = require('./shell');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
 
@@ -68,13 +69,13 @@ function exec(conn, command) {
 }
 
 async function readFile(conn, remotePath) {
-  return exec(conn, `cat "${remotePath}"`);
+  return exec(conn, `cat ${shellQuote(remotePath)}`);
 }
 
 async function writeFile(conn, remotePath, content) {
   // Write via base64 to avoid any shell quoting issues with special characters
   const b64 = Buffer.from(content).toString('base64');
-  await exec(conn, `echo '${b64}' | base64 -d > "${remotePath}"`);
+  await exec(conn, `echo '${b64}' | base64 -d > ${shellQuote(remotePath)}`);
 }
 
 function disconnect(env) {

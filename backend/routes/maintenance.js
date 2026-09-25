@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { connect, exec } = require('../services/ssh');
 const { decryptField } = require('../encryption');
+const { shellQuote } = require('../services/shell');
 
 function getServerCfg(env) {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
@@ -29,7 +30,7 @@ router.get('/:env', async (req, res) => {
 
   try {
     const conn = await connect(req.params.env, cfg.sshCfg);
-    const out = await exec(conn, `test -f "${cfg.server.maintenance_flag_path}" && echo 1 || echo 0`);
+    const out = await exec(conn, `test -f ${shellQuote(cfg.server.maintenance_flag_path)} && echo 1 || echo 0`);
     res.json({ enabled: out.trim() === '1', configured: true });
   } catch (err) {
     res.status(503).json({ error: err.message });
@@ -44,8 +45,8 @@ router.post('/:env', async (req, res) => {
 
   const { enabled } = req.body;
   const cmd = enabled
-    ? `touch "${cfg.server.maintenance_flag_path}"`
-    : `rm -f "${cfg.server.maintenance_flag_path}"`;
+    ? `touch ${shellQuote(cfg.server.maintenance_flag_path)}`
+    : `rm -f ${shellQuote(cfg.server.maintenance_flag_path)}`;
 
   try {
     const conn = await connect(req.params.env, cfg.sshCfg);

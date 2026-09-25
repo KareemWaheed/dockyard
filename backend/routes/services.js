@@ -3,6 +3,7 @@ const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
 const { appendService } = require('../services/compose');
 const { decryptField } = require('../encryption');
+const { shellQuote, isValidName } = require('../services/shell');
 
 // POST /api/services/:env/:stackIdx
 // body: { name, image, ports, environment, restart }
@@ -28,6 +29,7 @@ router.post('/:env/:stackIdx', async (req, res) => {
 
   const { name, image, ports, environment, restart } = req.body;
   if (!name || !image) return res.status(400).json({ error: 'name and image required' });
+  if (!isValidName(name)) return res.status(400).json({ error: 'Invalid service name' });
 
   const dc = server.docker_compose_cmd || 'docker compose';
   try {
@@ -35,7 +37,7 @@ router.post('/:env/:stackIdx', async (req, res) => {
     const composeContent = await readFile(conn, stack.path);
     const updated = appendService(composeContent, { name, image, ports, environment, restart });
     await writeFile(conn, stack.path, updated);
-    await exec(conn, `${dc} -f "${stack.path}" up -d "${name}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stack.path)} up -d ${shellQuote(name)}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

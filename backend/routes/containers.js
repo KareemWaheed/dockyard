@@ -9,6 +9,7 @@ const { writeHistory } = require('../services/history');
 const { notifyDeploy } = require('../services/notify');
 const path = require('path').posix;
 const { decryptField } = require('../encryption');
+const { shellQuote, isValidName } = require('../services/shell');
 
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
@@ -32,6 +33,19 @@ function readManagedPasswordFromAppEnv() {
   return null;
 }
 
+// Every action that runs compose commands or writes files must target a stack
+// configured for this server — never an arbitrary path from the request body.
+router.post('/:env/:containerName/:action', (req, res, next) => {
+  if (req.params.action === 'note') return next();
+  const server = db.prepare('SELECT id FROM servers WHERE env_key = ?').get(req.params.env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${req.params.env}` });
+  const { stackPath, serviceName } = req.body || {};
+  if (!isValidName(serviceName)) return res.status(400).json({ error: 'Invalid service name' });
+  const stack = db.prepare('SELECT id FROM compose_stacks WHERE server_id = ? AND path = ?').get(server.id, stackPath);
+  if (!stack) return res.status(400).json({ error: 'Unknown stack path for this environment' });
+  next();
+});
+
 router.post('/:env/:containerName/restart', async (req, res) => {
   const { env, containerName } = req.params;
   const { stackPath, serviceName, stackName = '' } = req.body;
@@ -43,7 +57,7 @@ router.post('/:env/:containerName/restart', async (req, res) => {
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" restart "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} restart ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'restart', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'restart', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -65,7 +79,7 @@ router.post('/:env/:containerName/stop', async (req, res) => {
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" stop "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} stop ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'stop', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'stop', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -88,7 +102,7 @@ router.post('/:env/:containerName/up', async (req, res) => {
   try {
     const conn = await connect(env, serverCfg);
     const flag = forceRecreate ? '--force-recreate' : '';
-    await exec(conn, `${dc} -f "${stackPath}" up -d ${flag} "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${flag} ${shellQuote(serviceName)}`);
     const upAction = forceRecreate ? 'force-recreate' : 'up';
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: upAction, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: upAction, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -112,8 +126,8 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" pull "${serviceName}"`);
-    await exec(conn, `${dc} -f "${stackPath}" up -d --force-recreate "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} pull ${shellQuote(serviceName)}`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d --force-recreate ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'pull-recreate', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'pull-recreate', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -151,7 +165,7 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
     const composeContent = await readFile(conn, stackPath);
     const updatedCompose = setManagedLabelInCompose(composeContent, serviceName, !!enabled);
     await writeFile(conn, stackPath, updatedCompose);
-    await exec(conn, `${dc} -f "${stackPath}" up -d "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${shellQuote(serviceName)}`);
 
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -193,7 +207,7 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
       const updated = updateImageInCompose(composeContent, serviceName, newTag);
       await writeFile(conn, stackPath, updated);
     }
-    await exec(conn, `${dc} -f "${stackPath}" up -d --pull always --force-recreate "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d --pull always --force-recreate ${shellQuote(serviceName)}`);
     if (note !== undefined) setNote(env, containerName, note);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-tag', oldTag, newTag, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'update-tag', fromTag: oldTag, toTag: newTag, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -234,7 +248,7 @@ router.post('/:env/:containerName/update-env', async (req, res) => {
       await writeFile(conn, stackPath, updated);
     }
 
-    await exec(conn, `${dc} -f "${stackPath}" up -d "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-env', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'update-env', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -270,7 +284,7 @@ router.post('/:env/:containerName/version-info', async (req, res) => {
   const dc = server.docker_compose_cmd || 'docker compose';
   try {
     const conn = await connect(env, serverCfg);
-    const raw = await exec(conn, `${dc} -f "${stackPath}" exec -T "${serviceName}" cat "${vi.path}"`);
+    const raw = await exec(conn, `${dc} -f ${shellQuote(stackPath)} exec -T ${shellQuote(serviceName)} cat ${shellQuote(vi.path)}`);
     res.json(parseVersionInfo(raw, vi.format));
   } catch (err) {
     res.status(500).json({ error: err.message });
