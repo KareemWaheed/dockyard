@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
-const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose } = require('../services/compose');
+const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose, validateEnvChanges, applyEnvChanges } = require('../services/compose');
 const { parseVersionInfo } = require('../services/docker');
 const { setNote } = require('../notes');
 const { getNote } = require('../notes');
@@ -221,7 +221,13 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
 
 router.post('/:env/:containerName/update-env', async (req, res) => {
   const { env, containerName } = req.params;
-  const { stackPath, serviceName, key, value, stackName = '' } = req.body;
+  const { stackPath, serviceName, stackName = '' } = req.body;
+  const changes = Array.isArray(req.body.changes)
+    ? req.body.changes
+    : [{ key: req.body.key, value: req.body.value }];
+  const invalid = validateEnvChanges(changes);
+  if (invalid) return res.status(400).json({ error: invalid });
+
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
@@ -231,22 +237,11 @@ router.post('/:env/:containerName/update-env', async (req, res) => {
   try {
     const conn = await connect(env, serverCfg);
     const composeContent = await readFile(conn, stackPath);
-    const composeDoc = require('js-yaml').load(composeContent);
-    const service = composeDoc.services?.[serviceName];
-    const envEntry = Array.isArray(service?.environment)
-      ? service.environment.find(e => e.startsWith(`${key}=`))
-      : service?.environment?.[key];
-
-    if (envEntry && typeof envEntry === 'string' && envEntry.includes('${')) {
-      // env-file mode
-      const envPath = path.join(path.dirname(stackPath), '.env');
-      const envContent = await readFile(conn, envPath).catch(() => '');
-      const updated = updateEnvVar(envContent, key, value);
-      await writeFile(conn, envPath, updated);
-    } else {
-      const updated = addEnvVarToCompose(composeContent, serviceName, key, value);
-      await writeFile(conn, stackPath, updated);
-    }
+    const envPath = path.join(path.dirname(stackPath), '.env');
+    const envContent = await readFile(conn, envPath).catch(() => '');
+    const out = applyEnvChanges(composeContent, envContent, serviceName, changes);
+    if (out.env !== null) await writeFile(conn, envPath, out.env);
+    if (out.compose !== null) await writeFile(conn, stackPath, out.compose);
 
     await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-env', success: true, durationMs: Date.now() - startTime, noteSnapshot });
