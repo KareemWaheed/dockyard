@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTheme } from '@/app/ThemeProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { DialogProvider } from '@/app/DialogProvider';
 
 function ThemedToaster() {
   const { theme } = useTheme();
@@ -13,8 +14,10 @@ export function AppProviders({ queryClient, children }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider delayDuration={300}>
-          {children}
-          <ThemedToaster />
+          <DialogProvider>
+            {children}
+            <ThemedToaster />
+          </DialogProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
