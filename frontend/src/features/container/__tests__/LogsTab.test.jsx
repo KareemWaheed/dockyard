@@ -40,4 +40,16 @@ describe('LogsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Reconnect' }));
     expect(FakeSocket.instances).toHaveLength(2);
   });
+
+  it('shows the reconnect banner when the backend sends a closed message without closing the socket', async () => {
+    render(<LogsTab env="stage" container={{ name: 'web' }} />);
+    const ws = FakeSocket.instances[0];
+    act(() => {
+      ws.onopen?.();
+      ws.emit({ type: 'line', text: 'boot ok\n' });
+    });
+    act(() => ws.emit({ type: 'closed' }));
+    expect(screen.getByText('Disconnected from the log stream.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+  });
 });

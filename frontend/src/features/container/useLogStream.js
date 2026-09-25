@@ -16,6 +16,7 @@ export function useLogStream(env, container) {
       const msg = JSON.parse(e.data);
       if (msg.type === 'line') setBuf((b) => appendChunk(b.lines, b.partial, msg.text));
       if (msg.type === 'error') setBuf((b) => appendChunk(b.lines, b.partial, `\nERROR: ${msg.message}\n`));
+      if (msg.type === 'closed') setStatus('closed');
     };
     ws.onclose = () => setStatus('closed');
     ws.onerror = () => setStatus('closed');
