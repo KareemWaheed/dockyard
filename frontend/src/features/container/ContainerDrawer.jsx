@@ -11,6 +11,7 @@ import { DrawerHeader } from '@/features/container/DrawerHeader';
 import { InfoTab } from '@/features/container/InfoTab';
 import { HistoryTab } from '@/features/container/HistoryTab';
 import { DeployTab } from '@/features/container/DeployTab';
+import { LogsTab } from '@/features/container/LogsTab';
 
 const ExpandedContext = createContext([false, () => {}]);
 export const useDrawerExpanded = () => useContext(ExpandedContext);
@@ -23,6 +24,7 @@ export function drawerTabs(container, env) {
   const inStack = !!container.stackPath && !container.standalone;
   return [
     inStack && container.managed && { value: 'deploy', label: 'Deploy', render: () => <DeployTab key={`${env}/${container.name}`} env={env} container={container} /> },
+    { value: 'logs', label: 'Logs', render: () => <LogsTab key={`${env}/${container.name}`} env={env} container={container} /> },
     inStack && container.hasVersionInfo && { value: 'info', label: 'Build info', render: () => <InfoTab env={env} container={container} /> },
     inStack && { value: 'history', label: 'History', render: () => <HistoryTab env={env} container={container} /> },
   ].filter(Boolean);
