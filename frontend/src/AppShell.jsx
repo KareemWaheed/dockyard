@@ -3,10 +3,10 @@ import { fetchContainers, fetchSettingsServers } from './api';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DashboardView from './components/DashboardView';
-import BuildView from './components/BuildView';
-import HistoryView from './components/HistoryView';
-import SettingsView from './components/SettingsView';
-import FlywayView from './components/FlywayView';
+import BuildView from './legacy/BuildView';
+import HistoryView from './legacy/HistoryView';
+import SettingsView from './legacy/SettingsView';
+import FlywayView from './legacy/FlywayView';
 import CommandPalette from './components/CommandPalette';
 
 const POLL_MS = 30000;
