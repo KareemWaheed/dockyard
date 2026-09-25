@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import Sidebar from '@/app/Sidebar';
 import { LayoutContext } from '@/app/layoutContext';
 import { usePref } from '@/lib/storage';
+import ContainerDrawer from '@/features/container/ContainerDrawer';
 
 export default function AppLayout() {
   const [activityOpen, setActivityOpen] = usePref('activityOpen', false);
@@ -36,6 +37,7 @@ export default function AppLayout() {
             <Outlet />
           </main>
         </div>
+        <ContainerDrawer />
       </div>
     </LayoutContext.Provider>
   );
