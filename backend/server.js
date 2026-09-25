@@ -23,6 +23,7 @@ app.use('/api/history', require('./routes/history'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/flyway', require('./routes/flyway'));
 app.use('/api/maintenance', require('./routes/maintenance'));
+app.use('/api/deploy-suggestions', require('./routes/suggestions'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }));
