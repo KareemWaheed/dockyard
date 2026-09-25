@@ -8,12 +8,18 @@ import { LayoutContext } from '@/app/layoutContext';
 import { usePref } from '@/lib/storage';
 import ContainerDrawer from '@/features/container/ContainerDrawer';
 import { ActivityPanel } from '@/features/activity/ActivityPanel';
+import { CommandPalette } from '@/features/palette/CommandPalette';
 
 export default function AppLayout() {
   const [activityOpen, setActivityOpen] = usePref('activityOpen', false);
   const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const toggleActivity = useCallback(() => setActivityOpen((o) => !o), [setActivityOpen]);
-  const layout = useMemo(() => ({ activityOpen, setActivityOpen, toggleActivity }), [activityOpen, setActivityOpen, toggleActivity]);
+  const openPalette = useCallback(() => setPaletteOpen(true), [setPaletteOpen]);
+  const layout = useMemo(
+    () => ({ activityOpen, setActivityOpen, toggleActivity, openPalette }),
+    [activityOpen, setActivityOpen, toggleActivity, openPalette],
+  );
 
   useEffect(() => {
     const onKey = (e) => {
@@ -26,6 +32,17 @@ export default function AppLayout() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [toggleActivity]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <LayoutContext.Provider value={layout}>
@@ -52,6 +69,7 @@ export default function AppLayout() {
         </div>
         {activityOpen && <ActivityPanel />}
         <ContainerDrawer />
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
     </LayoutContext.Provider>
   );
