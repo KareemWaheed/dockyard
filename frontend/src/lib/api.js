@@ -19,20 +19,20 @@ async function readError(r) {
 
 export async function fetchContainers(env) {
   const r = await fetch(`${BASE}/servers/${env}/containers`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function containerAction(env, containerName, action, body) {
   const r = await fetch(
-    `${BASE}/containers/${env}/${containerName}/${action}`,
+    `${BASE}/containers/${env}/${encodeURIComponent(containerName)}/${action}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
   );
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -480,4 +480,17 @@ export async function cancelFlywayRun(id) {
   const r = await fetch(`${BASE}/flyway/runs/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+// ─── Rebuild helpers ─────────────────────────────────────────────────────────
+
+export async function fetchDeploySuggestions(env, service, { image = "", current = "" } = {}) {
+  const params = new URLSearchParams({ image, current });
+  const r = await fetch(`${BASE}/deploy-suggestions/${env}/${encodeURIComponent(service)}?${params}`);
+  if (!r.ok) throw await readError(r);
+  return r.json();
+}
+
+export function fetchVersionInfo(env, containerName, { stackPath, serviceName }) {
+  return containerAction(env, containerName, "version-info", { stackPath, serviceName });
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAppConfig, updateAppConfig } from '../../api';
+import { fetchAppConfig, updateAppConfig } from '../../lib/api';
 
 export default function AwsTab() {
   const [cfg, setCfg] = useState({ region: '', description: '', accessKeyId: '', secretAccessKey: '' });

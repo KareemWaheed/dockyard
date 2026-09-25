@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchContainers, fetchSettingsServers } from './api';
+import { fetchContainers, fetchSettingsServers } from './lib/api';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DashboardView from './components/DashboardView';

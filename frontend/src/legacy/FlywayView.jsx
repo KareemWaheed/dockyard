@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   fetchProjects, fetchBranches,
   fetchFlywayEnvs, startFlywayRun, fetchFlywayRuns, cancelFlywayRun,
-} from '../api';
+} from '../lib/api';
 import SearchableSelect from './SearchableSelect';
 
 function wsBase() {

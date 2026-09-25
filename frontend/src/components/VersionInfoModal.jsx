@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from './UpdateTagModal';
-import { containerAction } from '../api';
+import { containerAction } from '../lib/api';
 
 export default function VersionInfoModal({ env, container, stackPath, onClose }) {
   const [vi, setVi] = useState(null);

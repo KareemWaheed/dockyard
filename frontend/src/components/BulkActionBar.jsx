@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { containerAction } from '../api';
+import { containerAction } from '../lib/api';
 
 export default function BulkActionBar({ env, selected, onClear, onDone }) {
   const [results, setResults] = useState([]);

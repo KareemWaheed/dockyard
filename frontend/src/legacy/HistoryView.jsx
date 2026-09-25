@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchHistory } from '../api';
+import { fetchHistory } from '../lib/api';
 
 const ENVS = ['all', 'dev', 'test', 'stage', 'prod'];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { whitelistIp, restartVpn, getMaintenance, setMaintenance } from '../api';
+import { whitelistIp, restartVpn, getMaintenance, setMaintenance } from '../lib/api';
 import StackGroup from './StackGroup';
 import ContainerRow from './ContainerRow';
 import BulkActionBar from './BulkActionBar';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { addService } from '../api';
+import { addService } from '../lib/api';
 import { Modal } from './UpdateTagModal';
 
 export default function AddServicePanel({ env, stackIdx, stackPath, existingServices, onClose, onDone }) {

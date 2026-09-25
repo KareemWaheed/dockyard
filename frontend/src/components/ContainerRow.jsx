@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { containerAction, saveNote } from '../api';
+import { containerAction, saveNote } from '../lib/api';
 import LogsPanel from './LogsPanel';
 import EnvPanel from './EnvPanel';
 import UpdateTagModal from './UpdateTagModal';

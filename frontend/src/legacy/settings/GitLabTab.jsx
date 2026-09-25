@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAppConfig, updateAppConfig } from '../../api';
+import { fetchAppConfig, updateAppConfig } from '../../lib/api';
 
 export default function GitLabTab() {
   const [cfg, setCfg] = useState({ token: '', baseUrl: '', projects: {} });

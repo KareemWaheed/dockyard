@@ -7,7 +7,7 @@ import BuildProjectsTab from "./settings/BuildProjectsTab";
 import FlywayTab from "./settings/FlywayTab";
 import CapRoverTab from "./settings/CapRoverTab";
 import VpnTab from "./settings/VpnTab";
-import { exportSettings, importSettings } from "../api";
+import { exportSettings, importSettings } from "../lib/api";
 
 const TABS = [
   { id: "servers", label: "Servers", Component: ServersTab },

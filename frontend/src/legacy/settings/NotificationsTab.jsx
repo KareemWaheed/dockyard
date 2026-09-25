@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchNotifications, createNotification, updateNotification, deleteNotification, testNotification } from '../../api';
+import { fetchNotifications, createNotification, updateNotification, deleteNotification, testNotification } from '../../lib/api';
 
 const EMPTY_EMAIL = { host: '', port: 587, secure: false, user: '', pass: '', from: '', to: '' };
 const EMPTY_WEBHOOK = { url: '', headers: {} };

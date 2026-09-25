@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { containerAction } from '../api';
+import { containerAction } from '../lib/api';
 
 export default function UpdateTagModal({ env, container, stackPath, onClose, onDone }) {
   const currentTag = container.image?.split(':').pop() || '';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { containerAction } from '../api';
+import { containerAction } from '../lib/api';
 import { Modal } from './UpdateTagModal';
 
 export default function EnvPanel({ env, container, stackPath, onClose, onDone }) {

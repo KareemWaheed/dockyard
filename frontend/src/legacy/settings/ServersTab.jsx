@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchSettingsServers, createSettingsServer, updateSettingsServer, deleteSettingsServer } from '../../api';
+import { fetchSettingsServers, createSettingsServer, updateSettingsServer, deleteSettingsServer } from '../../lib/api';
 
 const EMPTY_FORM = {
   env_key: '', name: '', host: '', ssh_username: '',

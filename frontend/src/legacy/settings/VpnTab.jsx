@@ -1,6 +1,6 @@
 // frontend/src/components/settings/VpnTab.jsx
 import React, { useEffect, useState } from 'react';
-import { getVpnStatus, vpnAction } from '../../api';
+import { getVpnStatus, vpnAction } from '../../lib/api';
 
 export default function VpnTab() {
   const [status, setStatus] = useState(null);

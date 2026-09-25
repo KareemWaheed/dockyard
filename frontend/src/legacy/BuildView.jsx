@@ -9,7 +9,7 @@ import {
   replayBuildRun,
   fetchCapRoverTargets,
   deployRunToCapRover,
-} from "../api";
+} from "../lib/api";
 import SearchableSelect from "./SearchableSelect";
 
 const RECENT_KEY = "dockyard_build_recent";

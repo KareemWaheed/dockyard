@@ -4,7 +4,7 @@ import {
   fetchFlywayEnvs,
   createFlywayEnv, updateFlywayEnv, deleteFlywayEnv,
   createFlywayDatabase, updateFlywayDatabase, deleteFlywayDatabase,
-} from '../../api';
+} from '../../lib/api';
 
 const EMPTY_ENV = { name: '', description: '' };
 const EMPTY_DB = {

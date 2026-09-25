@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAppConfig, updateAppConfig, fetchProjectRemote, updateProjectRemote } from '../../api';
+import { fetchAppConfig, updateAppConfig, fetchProjectRemote, updateProjectRemote } from '../../lib/api';
 
 const PARAM_TYPES = ['string', 'select', 'checkbox', 'multiselect'];
 

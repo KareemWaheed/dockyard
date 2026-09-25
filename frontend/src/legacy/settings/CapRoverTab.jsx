@@ -7,7 +7,7 @@ import {
   updateCapRoverTarget,
   deleteCapRoverTarget,
   testCapRoverTarget,
-} from "../../api";
+} from "../../lib/api";
 
 const EMPTY = {
   project: "",
