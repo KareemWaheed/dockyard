@@ -7,6 +7,7 @@ import { StatusDot, toneText } from '@/components/status';
 import { useTheme } from '@/app/ThemeProvider';
 import { envSummary } from '@/app/envSummary';
 import { useAllEnvs } from '@/lib/queries';
+import { useBuildActivity } from '@/features/activity/useBuildActivity';
 import { cn } from '@/lib/utils';
 
 const itemClass = ({ isActive }) =>
@@ -21,6 +22,7 @@ function SectionLabel({ children }) {
 
 export default function Sidebar({ onNavigate }) {
   const envs = useAllEnvs();
+  const { count: activeBuilds } = useBuildActivity();
   const { theme, toggleTheme } = useTheme();
   const [buildInfo, setBuildInfo] = useState(null);
 
@@ -59,6 +61,7 @@ export default function Sidebar({ onNavigate }) {
       <SectionLabel>Tools</SectionLabel>
       <NavLink to="/builds" className={itemClass} onClick={onNavigate}>
         <Hammer className="size-4" aria-hidden="true" /> <span className="flex-1">Builds</span>
+        {activeBuilds > 0 && <span className="rounded-full bg-accent px-1.5 text-[11px] font-medium text-accent-foreground">{activeBuilds}</span>}
       </NavLink>
       <NavLink to="/migrations" className={itemClass} onClick={onNavigate}>
         <Database className="size-4" aria-hidden="true" /> Migrations

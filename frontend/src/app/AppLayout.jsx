@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,12 +7,25 @@ import Sidebar from '@/app/Sidebar';
 import { LayoutContext } from '@/app/layoutContext';
 import { usePref } from '@/lib/storage';
 import ContainerDrawer from '@/features/container/ContainerDrawer';
+import { ActivityPanel } from '@/features/activity/ActivityPanel';
 
 export default function AppLayout() {
   const [activityOpen, setActivityOpen] = usePref('activityOpen', false);
   const [navOpen, setNavOpen] = useState(false);
   const toggleActivity = useCallback(() => setActivityOpen((o) => !o), [setActivityOpen]);
   const layout = useMemo(() => ({ activityOpen, setActivityOpen, toggleActivity }), [activityOpen, setActivityOpen, toggleActivity]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'a' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      if (document.querySelector('[role="alertdialog"], [role="dialog"]')) return;
+      toggleActivity();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [toggleActivity]);
 
   return (
     <LayoutContext.Provider value={layout}>
@@ -37,6 +50,7 @@ export default function AppLayout() {
             <Outlet />
           </main>
         </div>
+        {activityOpen && <ActivityPanel />}
         <ContainerDrawer />
       </div>
     </LayoutContext.Provider>
