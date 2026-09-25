@@ -66,7 +66,7 @@ export function StackTable({ env, title, subtitle, containers, activeName, onOpe
   return (
     <section className="overflow-hidden rounded-xl border bg-card">
       <div className="flex items-center gap-2 border-b px-3.5 py-2.5">
-        <h2 className="text-[13px] font-semibold">{title}</h2>
+        <h2 className="text-[15px] font-semibold">{title}</h2>
         {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
         <div className="ml-auto">{headerRight}</div>
       </div>
