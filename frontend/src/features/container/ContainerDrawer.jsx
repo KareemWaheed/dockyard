@@ -10,6 +10,7 @@ import { useDrawer } from '@/features/container/useDrawer';
 import { DrawerHeader } from '@/features/container/DrawerHeader';
 import { InfoTab } from '@/features/container/InfoTab';
 import { HistoryTab } from '@/features/container/HistoryTab';
+import { DeployTab } from '@/features/container/DeployTab';
 
 const ExpandedContext = createContext([false, () => {}]);
 export const useDrawerExpanded = () => useContext(ExpandedContext);
@@ -21,6 +22,7 @@ const MAX_W = 800;
 export function drawerTabs(container, env) {
   const inStack = !!container.stackPath && !container.standalone;
   return [
+    inStack && container.managed && { value: 'deploy', label: 'Deploy', render: () => <DeployTab key={`${env}/${container.name}`} env={env} container={container} /> },
     inStack && container.hasVersionInfo && { value: 'info', label: 'Build info', render: () => <InfoTab env={env} container={container} /> },
     inStack && { value: 'history', label: 'History', render: () => <HistoryTab env={env} container={container} /> },
   ].filter(Boolean);
