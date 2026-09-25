@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router';
-import { Anchor, Database, Hammer, History, LayoutGrid, Moon, Settings, Sun } from 'lucide-react';
+import { Anchor, Database, Hammer, History, LayoutGrid, Moon, Rows3, Settings, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusDot, toneText } from '@/components/status';
@@ -23,7 +23,7 @@ function SectionLabel({ children }) {
 export default function Sidebar({ onNavigate }) {
   const envs = useAllEnvs();
   const { count: activeBuilds } = useBuildActivity();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, density, setDensity } = useTheme();
   const [buildInfo, setBuildInfo] = useState(null);
 
   useEffect(() => {
@@ -76,6 +76,16 @@ export default function Sidebar({ onNavigate }) {
       <div className="mt-auto flex items-center gap-2 px-2 pt-4 text-[11px] text-muted-foreground">
         <Button variant="ghost" size="icon" className="size-7" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
           {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label={density === 'compact' ? 'Use comfortable rows' : 'Use compact rows'}
+          aria-pressed={density === 'compact'}
+          onClick={() => setDensity(density === 'compact' ? 'comfortable' : 'compact')}
+        >
+          <Rows3 className="size-4" />
         </Button>
         {buildInfo?.shortCommit && buildInfo.shortCommit !== 'unknown' && (
           <span title={`Branch: ${buildInfo.branch}\nCommit: ${buildInfo.commit}\nBuilt: ${buildInfo.buildTime}`}>

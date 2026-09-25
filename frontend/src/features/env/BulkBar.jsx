@@ -11,7 +11,7 @@ import { TagCombobox } from '@/features/container/TagCombobox';
 
 export function BulkBar({ env, containers, onClear }) {
   const mutation = useContainerAction(env);
-  const { confirm, showError } = useDialogs();
+  const { confirm: ask, showError } = useDialogs();
   const all = useAllEnvs();
   const [busy, setBusy] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
@@ -29,7 +29,7 @@ export function BulkBar({ env, containers, onClear }) {
     const text = describeAction(action, { service: `${n} containers`, env, toTag: extraBody.newTag });
     const level = confirmPolicy(action, env);
     if (level !== 'none') {
-      const res = await confirm({ ...text, level, typedValue: env, destructive: !!def.destructive });
+      const res = await ask({ ...text, level, typedValue: env, destructive: !!def.destructive });
       if (!res.ok) return;
     }
     setBusy(true);

@@ -8,7 +8,7 @@ import { ACTIONS, confirmPolicy, describeAction } from '@/features/container/act
 // Runs one logical action on one container: confirmation per §6.1, toasts, Undo for deploys.
 export function useRunAction(env) {
   const mutation = useContainerAction(env);
-  const { confirm, showError } = useDialogs();
+  const { confirm: ask, showError } = useDialogs();
 
   const run = useCallback(
     async function run(container, action, extraBody = {}) {
@@ -23,7 +23,7 @@ export function useRunAction(env) {
       let body = { ...(def.body || {}), ...extraBody };
 
       if (level !== 'none' || requirePassword) {
-        const res = await confirm({
+        const res = await ask({
           ...text,
           level: level === 'typed' ? 'typed' : 'confirm',
           typedValue: env,
@@ -54,7 +54,7 @@ export function useRunAction(env) {
         return false;
       }
     },
-    [mutation, confirm, showError, env],
+    [mutation, ask, showError, env],
   );
 
   return run;

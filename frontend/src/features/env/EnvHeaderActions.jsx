@@ -17,7 +17,7 @@ import { EnvFixActions } from '@/features/overview/EnvFixActions';
 
 export function EnvHeaderActions({ env }) {
   const qc = useQueryClient();
-  const { confirm } = useDialogs();
+  const { confirm: ask } = useDialogs();
   const { data: servers } = useServers();
   const server = servers?.find((s) => s.env_key === env);
   const [fixOpen, setFixOpen] = useState(false);
@@ -31,7 +31,7 @@ export function EnvHeaderActions({ env }) {
     const action = next ? 'maintenance-on' : 'maintenance-off';
     const text = describeAction(action, { env });
     const level = confirmPolicy(action, env);
-    const res = await confirm({ ...text, level, typedValue: env, destructive: next });
+    const res = await ask({ ...text, level, typedValue: env, destructive: next });
     if (!res.ok) return;
     try {
       await setMaintenance(env, next);
