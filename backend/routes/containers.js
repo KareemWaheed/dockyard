@@ -11,6 +11,12 @@ const path = require('path').posix;
 const { decryptField } = require('../encryption');
 const { shellQuote, isValidName } = require('../services/shell');
 
+// Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+function isValidTag(tag) {
+  return typeof tag === 'string' && TAG_RE.test(tag);
+}
+
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
 function getServerConfig(server) {
@@ -180,6 +186,7 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
 router.post('/:env/:containerName/update-tag', async (req, res) => {
   const { env, containerName } = req.params;
   const { stackPath, serviceName, newTag, note, stackName = '' } = req.body;
+  if (!isValidTag(newTag)) return res.status(400).json({ error: 'Invalid image tag' });
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
