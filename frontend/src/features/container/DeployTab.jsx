@@ -11,7 +11,7 @@ import { imageTag } from '@/lib/image';
 import { qk, useAllEnvs, usePendingAction } from '@/lib/queries';
 import { useDrawer } from '@/features/container/useDrawer';
 import { useRunAction } from '@/features/container/useRunAction';
-import { buildSuggestionGroups } from '@/features/container/suggestions';
+import { buildSuggestionGroups, isValidTag } from '@/features/container/suggestions';
 import { TagCombobox } from '@/features/container/TagCombobox';
 
 export function DeployTab({ env, container }) {
@@ -21,7 +21,8 @@ export function DeployTab({ env, container }) {
   const pending = usePendingAction(env, container.name);
   const service = container.serviceName || container.name;
   const current = imageTag(container.image);
-  const [selected, setSelected] = useState(prefillTag || '');
+  const [selected, setSelected] = useState(isValidTag(prefillTag) ? prefillTag : '');
+  const [comboboxKey, setComboboxKey] = useState(0);
   const deployRef = useRef(null);
 
   const otherEnvs = all
@@ -47,18 +48,25 @@ export function DeployTab({ env, container }) {
 
   const deploy = async () => {
     if (!selected) return;
-    if (await run(container, 'deploy', { newTag: selected })) setSelected('');
+    if (await run(container, 'deploy', { newTag: selected })) {
+      setSelected('');
+      setComboboxKey((k) => k + 1); // remounts TagCombobox, clearing its typed query too
+    }
   };
   const busy = !!pending;
 
   return (
     <div className="space-y-4">
       <TagCombobox
+        key={comboboxKey}
         groups={groups}
         initialQuery={prefillTag || ''}
         onPick={(tag) => {
           setSelected(tag);
           requestAnimationFrame(() => deployRef.current?.focus());
+        }}
+        onQueryChange={(query) => {
+          if (query !== selected) setSelected('');
         }}
       />
       {sugg.isError && <p className="text-xs text-muted-foreground">Build and history suggestions unavailable: {sugg.error.message}</p>}

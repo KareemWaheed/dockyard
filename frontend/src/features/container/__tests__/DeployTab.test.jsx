@@ -56,6 +56,27 @@ describe('DeployTab', () => {
     expect(within(d).getByTestId('deploy-preview')).toHaveTextContent('1.0 → 2.0');
   });
 
+  it('disables Deploy after picking a tag then typing a different one (I-2)', async () => {
+    renderApp('/env/stage/frontend?tab=deploy');
+    const d = await drawer();
+    const user = userEvent.setup();
+    await user.click(within(d).getByRole('option', { name: /2\.0.*on DEV/ }));
+    expect(within(d).getByTestId('deploy-preview')).toHaveTextContent('1.0 → 2.0');
+    const input = within(d).getByRole('combobox', { name: 'Tag to deploy' });
+    await user.clear(input);
+    await user.type(input, '3.0');
+    expect(within(d).getByRole('button', { name: 'Deploy to STAGE' })).toBeDisabled();
+    await user.click(within(d).getByRole('button', { name: 'Deploy to STAGE' }));
+    expect(api.containerAction).not.toHaveBeenCalledWith('stage', 'frontend', 'update-tag', expect.objectContaining({ newTag: '2.0' }));
+  });
+
+  it('rejects an invalid tag from the promote/prefill URL (I-4)', async () => {
+    renderApp('/?open=stage/frontend&tab=deploy&tag=bad%20tag');
+    const d = await drawer();
+    expect(within(d).getByRole('button', { name: 'Deploy to STAGE' })).toBeDisabled();
+    expect(within(d).getByText('Not a valid image tag')).toBeInTheDocument();
+  });
+
   it('keeps risky actions behind the More menu', async () => {
     renderApp('/env/stage/frontend?tab=deploy');
     const d = await drawer();

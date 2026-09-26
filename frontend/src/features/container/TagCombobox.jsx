@@ -2,18 +2,23 @@ import { useState } from 'react';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { isValidTag } from '@/features/container/suggestions';
 
-export function TagCombobox({ groups, initialQuery = '', onPick }) {
+export function TagCombobox({ groups, initialQuery = '', onPick, onQueryChange }) {
   const [query, setQuery] = useState(initialQuery);
   const typed = query.trim();
   const known = groups.some((g) => g.items.some((i) => i.tag === typed));
   const showTyped = typed && !known;
+
+  const handleQueryChange = (value) => {
+    setQuery(value);
+    onQueryChange?.(value.trim());
+  };
 
   return (
     // cmdk's <Input> gets its accessible name from the Command root's hidden
     // <label>, referenced via aria-labelledby (which wins over aria-label on
     // the input itself) — so the name has to be set here, not on CommandInput.
     <Command className="rounded-lg border" loop label="Tag to deploy">
-      <CommandInput autoFocus aria-label="Tag to deploy" placeholder="Tag to deploy…" value={query} onValueChange={setQuery} />
+      <CommandInput autoFocus aria-label="Tag to deploy" placeholder="Tag to deploy…" value={query} onValueChange={handleQueryChange} />
       <CommandList className="max-h-64">
         {groups.map((g) => (
           <CommandGroup key={g.heading} heading={g.heading}>
