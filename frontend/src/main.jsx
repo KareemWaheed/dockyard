@@ -8,7 +8,7 @@ import './index.css';
 import { routes } from './app/router';
 import { AppProviders } from './app/AppProviders';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 const router = createBrowserRouter(routes);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
