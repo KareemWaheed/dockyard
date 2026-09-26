@@ -67,6 +67,7 @@ export default function ContainerDrawer() {
     if (!open) return undefined;
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
+      if (e.defaultPrevented) return; // an open popover/menu (e.g. the "More" menu) already handled Esc
       if (document.querySelector('[role="alertdialog"], [role="dialog"]')) return; // a modal is handling Esc
       closeDrawer();
     };
