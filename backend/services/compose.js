@@ -40,10 +40,16 @@ function updateImageInCompose(composeContent, serviceName, newTag) {
   return yaml.dump(doc, { lineWidth: -1, quotingType: '"' });
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function updateEnvVar(envContent, varName, newValue) {
-  const re = new RegExp(`^(${varName}=).*$`, 'm');
+  const re = new RegExp(`^(${escapeRegExp(varName)}=).*$`, 'm');
   if (re.test(envContent)) {
-    return envContent.replace(re, `$1${newValue}`);
+    // A replacer function (not a "$1..." replacement pattern) so `$$`, `$'`,
+    // `$&`, etc. in newValue are never interpreted as special substitutions.
+    return envContent.replace(re, (_match, prefix) => prefix + newValue);
   }
   // Variable not present — append it
   const trailing = envContent.endsWith('\n') ? '' : '\n';

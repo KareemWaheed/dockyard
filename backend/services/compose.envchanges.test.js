@@ -1,6 +1,6 @@
 const assert = require('assert');
 const yaml = require('js-yaml');
-const { validateEnvChanges, applyEnvChanges } = require('./compose');
+const { validateEnvChanges, applyEnvChanges, updateEnvVar } = require('./compose');
 
 assert.strictEqual(validateEnvChanges([{ key: 'API_URL', value: 'http://x' }]), null);
 assert.match(validateEnvChanges([]), /at least one/);
@@ -38,4 +38,14 @@ assert.strictEqual(onlyCompose.env, null, '.env untouched → null');
 const onlyEnv = applyEnvChanges(compose, envFile, 'web', [{ key: 'FROM_FILE', value: 'y' }]);
 assert.strictEqual(onlyEnv.compose, null, 'compose untouched → null');
 assert.throws(() => applyEnvChanges(compose, envFile, 'missing', [{ key: 'A', value: '1' }]), /not found/);
+
+// I-1: `$`-bearing values must round-trip verbatim through String.prototype.replace's
+// special replacement patterns ($$, $', $&, $`, $1...).
+for (const value of ['x$$y', "x$'z", 'p$&q', 'a$`b', 'v$1w']) {
+  const result = updateEnvVar('FROM_FILE=before\nOTHER=keep\n', 'FROM_FILE', value);
+  assert.strictEqual(result, `FROM_FILE=${value}\nOTHER=keep\n`, `updateEnvVar must not interpret $ specials in ${JSON.stringify(value)}`);
+}
+const dollarOut = applyEnvChanges(compose, envFile, 'web', [{ key: 'FROM_FILE', value: 'x$$y' }]);
+assert.strictEqual(dollarOut.env, 'FROM_FILE=x$$y\nOTHER=keep\n');
+
 console.log('compose env-changes tests passed');
