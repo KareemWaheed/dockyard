@@ -70,7 +70,10 @@ export function useContainerAction(env) {
         stackName: container.stackName || '',
         ...body,
       }),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.containers(env) }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.containers(env) });
+      qc.invalidateQueries({ queryKey: ['history'] });
+    },
   });
 }
 

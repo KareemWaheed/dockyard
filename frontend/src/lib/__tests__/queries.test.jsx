@@ -49,4 +49,15 @@ describe('queries', () => {
     await act(async () => release({ ok: true }));
     await waitFor(() => expect(result.current.pending).toBeNull());
   });
+
+  it('useContainerAction also invalidates history on settle (M-5)', async () => {
+    api.containerAction.mockResolvedValue({ ok: true });
+    const client = newClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const container = { name: 'web', serviceName: 'web', stackPath: '/m.yml', stackName: 'Main' };
+    const { result } = renderHook(() => useContainerAction('dev'), { wrapper: wrapperWith(client) });
+    await act(async () => { await result.current.mutateAsync({ container, action: 'restart', endpoint: 'restart', body: {} }); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: qk.containers('dev') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['history'] });
+  });
 });
