@@ -52,4 +52,30 @@ describe('LogsTab', () => {
     expect(screen.getByText('Disconnected from the log stream.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
   });
+
+  it('keeps auto-following once the 5,000-line cap is reached (M-4)', () => {
+    // scrollHeight isn't laid out in jsdom — stand in a value the test controls,
+    // so we can tell whether the auto-follow effect re-ran on the latest chunk.
+    let scrollHeightMock = 0;
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => scrollHeightMock });
+
+    const { container } = render(<LogsTab env="stage" container={{ name: 'web' }} />);
+    const body = container.querySelector('.overflow-auto');
+    const ws = FakeSocket.instances[0];
+
+    scrollHeightMock = 100;
+    act(() => {
+      ws.onopen?.();
+      // 5001 lines in one chunk — pushes the buffer straight to the 5,000-line cap.
+      ws.emit({ type: 'line', text: `${Array.from({ length: 5001 }, (_, i) => `L${i}`).join('\n')}\n` });
+    });
+    expect(body.scrollTop).toBe(100);
+
+    scrollHeightMock = 200;
+    act(() => ws.emit({ type: 'line', text: 'NEWLINE\n' }));
+    // Still capped at 5,000 lines, but a new line arrived — follow must still scroll to bottom.
+    expect(body.scrollTop).toBe(200);
+
+    delete HTMLElement.prototype.scrollHeight;
+  });
 });

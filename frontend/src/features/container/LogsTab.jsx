@@ -36,7 +36,10 @@ export function LogsTab({ env, container }) {
 
   useEffect(() => {
     if (follow && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [shown.length, follow]);
+    // `lines` (not shown.length): once the 5,000-line cap is hit, its length
+    // stops changing even though new lines keep arriving (oldest evicted) —
+    // depend on the array reference so follow keeps working past the cap.
+  }, [lines, follow]);
 
   const onScroll = () => {
     const el = bodyRef.current;
