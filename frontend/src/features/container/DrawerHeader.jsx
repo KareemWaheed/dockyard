@@ -1,26 +1,32 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge, Tag } from '@/components/status';
 import { saveNote } from '@/lib/api';
 import { describeState } from '@/lib/containers';
 import { imageTag } from '@/lib/image';
-import { qk } from '@/lib/queries';
+import { qk, usePendingAction } from '@/lib/queries';
 import { useRunAction } from '@/features/container/useRunAction';
 
 export function DrawerHeader({ env, container, onClose }) {
   const qc = useQueryClient();
   const run = useRunAction(env);
+  const pending = usePendingAction(env, container.name);
   const [note, setNote] = useState(container.note || '');
   const state = describeState(container);
   const service = container.serviceName || container.name;
 
   const commitNote = async () => {
     if (note === (container.note || '')) return;
-    await saveNote(env, container.name, note);
-    qc.invalidateQueries({ queryKey: qk.containers(env) });
+    try {
+      await saveNote(env, container.name, note);
+      qc.invalidateQueries({ queryKey: qk.containers(env) });
+    } catch (err) {
+      toast.error('Could not save note', { description: err.message });
+    }
   };
 
   return (
@@ -34,7 +40,7 @@ export function DrawerHeader({ env, container, onClose }) {
           </p>
         </div>
         {!container.managed && container.stackPath && (
-          <Button size="sm" variant="outline" className="ml-auto" onClick={() => run(container, 'manage')}>Manage…</Button>
+          <Button size="sm" variant="outline" className="ml-auto" disabled={!!pending} onClick={() => run(container, 'manage')}>Manage…</Button>
         )}
         <Button size="icon" variant="ghost" className={container.managed || !container.stackPath ? 'ml-auto' : ''} aria-label="Close" onClick={onClose}>
           <X className="size-4" />

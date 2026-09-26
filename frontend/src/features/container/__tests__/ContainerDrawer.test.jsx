@@ -55,6 +55,17 @@ describe('ContainerDrawer', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/env/stage'));
   });
 
+  it('does not close the drawer when Escape only dismisses the open More menu (M-1)', async () => {
+    const { router } = renderApp('/env/stage/web?tab=deploy');
+    const d = await drawer();
+    const user = userEvent.setup();
+    await user.click(within(d).getByRole('button', { name: /More/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Stop' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: 'Stop' })).toBeNull());
+    expect(router.state.location.pathname).toBe('/env/stage/web');
+  });
+
   it('saves the note on blur', async () => {
     renderApp('/env/stage/web?tab=history');
     const d = await drawer();
@@ -64,6 +75,20 @@ describe('ContainerDrawer', () => {
     await user.type(note, 'release 16.4');
     await user.tab();
     expect(api.saveNote).toHaveBeenCalledWith('stage', 'web', 'release 16.4');
+  });
+
+  it('shows an error toast and keeps the typed text when saving the note fails (I-5)', async () => {
+    api.saveNote.mockRejectedValue(new Error('disk full'));
+    renderApp('/env/stage/web?tab=history');
+    const d = await drawer();
+    const user = userEvent.setup();
+    const note = within(d).getByRole('textbox', { name: 'Note' });
+    await user.clear(note);
+    await user.type(note, 'release 16.4');
+    await user.tab();
+    expect(await screen.findByText('Could not save note')).toBeInTheDocument();
+    expect(screen.getByText('disk full')).toBeInTheDocument();
+    expect(within(d).getByRole('textbox', { name: 'Note' })).toHaveValue('release 16.4');
   });
 
   it('renders build info key/values', async () => {
