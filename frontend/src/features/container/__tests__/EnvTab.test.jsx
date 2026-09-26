@@ -5,6 +5,7 @@ import { QueryClient } from '@tanstack/react-query';
 import * as api from '@/lib/api';
 import { AppProviders } from '@/app/AppProviders';
 import { EnvTab } from '@/features/container/EnvTab';
+import { useContainerAction } from '@/lib/queries';
 
 vi.mock('@/lib/api');
 
@@ -16,6 +17,13 @@ const setup = (c = container) => {
   render(<AppProviders queryClient={new QueryClient()}><EnvTab env="stage" container={c} /></AppProviders>);
   return userEvent.setup();
 };
+
+// Renders alongside EnvTab (sharing its QueryClient via AppProviders) to put
+// some other action for the same container "in flight" from elsewhere in the UI.
+function OtherActionTrigger({ c = container }) {
+  const m = useContainerAction('stage');
+  return <button onClick={() => m.mutate({ container: c, action: 'restart', endpoint: 'restart', body: {} })}>trigger-other</button>;
+}
 
 describe('EnvTab', () => {
   beforeEach(() => {
@@ -58,6 +66,23 @@ describe('EnvTab', () => {
     await user.type(screen.getByRole('textbox', { name: 'New variable name' }), 'BAD.KEY');
     expect(screen.getByText('Letters, digits and _ only; must not start with a digit')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
+  });
+
+  it('disables Apply while another action on this container is pending (M-6)', async () => {
+    api.containerAction.mockImplementation(() => new Promise(() => {})); // never resolves
+    const qc = new QueryClient();
+    render(
+      <AppProviders queryClient={qc}>
+        <EnvTab env="stage" container={container} />
+        <OtherActionTrigger />
+      </AppProviders>,
+    );
+    const user = userEvent.setup();
+    await user.clear(screen.getByRole('textbox', { name: 'API_URL' }));
+    await user.type(screen.getByRole('textbox', { name: 'API_URL' }), 'http://b');
+    expect(screen.getByRole('button', { name: 'Apply 1 change' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'trigger-other' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply 1 change' })).toBeDisabled());
   });
 
   it('is read-only for unmanaged containers', () => {

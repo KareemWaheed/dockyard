@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRunAction } from '@/features/container/useRunAction';
 import { ENV_KEY_RE, isSecretKey } from '@/features/container/maskEnv';
+import { usePendingAction } from '@/lib/queries';
 
 const MASK = '••••••';
 
 export function EnvTab({ env, container }) {
   const run = useRunAction(env);
+  const pending = usePendingAction(env, container.name);
   const editable = container.managed && !!container.stackPath;
   const vars = Object.entries(container.env || {}).sort(([a], [b]) => a.localeCompare(b));
   const [edits, setEdits] = useState({});
@@ -73,7 +75,7 @@ export function EnvTab({ env, container }) {
       </div>
       {editable && (
         <div className="sticky bottom-0 flex items-center gap-2 border-t bg-card pt-3">
-          <Button disabled={changes.length === 0 || invalidNew || busy} onClick={apply}>
+          <Button disabled={changes.length === 0 || invalidNew || busy || !!pending} onClick={apply}>
             Apply {changes.length} change{changes.length === 1 ? '' : 's'}
           </Button>
           <Button variant="ghost" disabled={changes.length === 0 && added.length === 0} onClick={discard}>Discard</Button>
