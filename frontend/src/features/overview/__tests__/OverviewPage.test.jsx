@@ -60,6 +60,16 @@ describe('Overview', () => {
     expect(screen.getByRole('rowheader', { name: /^worker/ })).toBeInTheDocument();
   });
 
+  it('does not let the grid steal Enter from the unreachable popover (I-3)', async () => {
+    const { router } = renderApp('/');
+    const user = userEvent.setup();
+    const trigger = await screen.findByRole('button', { name: /prod.*unreachable/i });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText("Can't reach prod")).toBeInTheDocument();
+    expect(router.state.location.search).not.toMatch(/open=/);
+  });
+
   it('shows the setup card when no servers are configured', async () => {
     api.fetchSettingsServers.mockResolvedValue([]);
     renderApp('/');

@@ -132,6 +132,10 @@ export function OverviewMatrix({ envs, rows, onOpen }) {
     };
     const handler = handlers[e.key];
     if (!handler || e.target.tagName === 'INPUT') return;
+    // Portaled popover content (column-header "unreachable" info, its fix
+    // buttons) bubbles keydown events up to this table — only handle keys
+    // that originate from an actual grid cell.
+    if (!e.target.closest('[role="gridcell"]')) return;
     e.preventDefault();
     handler();
   };
