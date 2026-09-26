@@ -20,7 +20,7 @@ export function BulkBar({ env, containers, onClear }) {
   const services = new Set(containers.map((c) => c.serviceName || c.name));
   const seen = new Set();
   const tagItems = all
-    .filter((e) => e.env !== env && e.data)
+    .filter((e) => e.env !== env && e.data && !e.isError)
     .flatMap((e) => flattenEnv(e.data).filter((c) => services.has(c.serviceName || c.name)).map((c) => ({ tag: imageTag(c.image), hint: `on ${e.env.toUpperCase()}`, source: 'env' })))
     .filter((i) => !seen.has(i.tag) && seen.add(i.tag));
 
@@ -45,7 +45,7 @@ export function BulkBar({ env, containers, onClear }) {
     }
     setBusy(false);
     if (failures.length === 0) {
-      toast.success(`${action} done for ${n} containers on ${env.toUpperCase()}`, { id });
+      toast.success(text.success, { id });
       onClear();
     } else {
       const details = failures.map((f) => `${f.name}: ${f.message}`).join('\n\n');
