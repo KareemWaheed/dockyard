@@ -22,7 +22,7 @@ export function ActivityPanel() {
   });
 
   return (
-    <aside aria-label="Activity" className="fixed inset-0 z-30 flex flex-col border-l bg-card md:static md:w-80 md:shrink-0">
+    <aside aria-label="Activity" className="fixed inset-0 z-30 flex flex-col border-l bg-card md:static md:w-80 md:shrink-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:pt-0 md:pb-0">
       <div className="flex items-center border-b px-4 py-3">
         <h2 className="text-[15px] font-semibold">Activity</h2>
         <Button size="icon" variant="ghost" className="ml-auto size-7" aria-label="Close activity" onClick={() => setActivityOpen(false)}>

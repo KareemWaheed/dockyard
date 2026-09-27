@@ -116,7 +116,7 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-auto p-4">{body}</div>
           {!needsClone && !branchesQ.isError && (
-            <SheetFooter className="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SheetFooter className="border-t p-4">
               <Button type="submit" className="h-10 w-full" disabled={!valid || submitting}>Build &amp; push</Button>
             </SheetFooter>
           )}

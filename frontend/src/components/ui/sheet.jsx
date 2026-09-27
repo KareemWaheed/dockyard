@@ -71,9 +71,17 @@ function SheetContent({
         )}
         {...props}
       >
-        {children}
+        {side === "left" || side === "right" ? (
+          // Full-height sheets keep their content and close button clear of the iOS status bar
+          // and home indicator (0px outside an installed PWA). A wrapper, so a caller's p-0 can't undo it.
+          <div data-slot="sheet-safe-area" className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+            {children}
+          </div>
+        ) : (
+          children
+        )}
         {showCloseButton && (
-          <SheetPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary">
+          <SheetPrimitive.Close className="absolute top-[calc(env(safe-area-inset-top)+1rem)] right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary">
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>

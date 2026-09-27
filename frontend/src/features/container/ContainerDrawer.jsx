@@ -39,7 +39,8 @@ function Shell({ children, label, width, expanded, onResizeStart }) {
       className={cn(
         // Mobile: full-screen overlay. Desktop: a flex sibling of <main>, so the table shrinks
         // instead of being covered and every column (including PROD) stays clickable.
-        'fixed inset-0 z-40 flex flex-col border-l bg-card md:relative md:inset-auto md:z-auto md:h-full md:shrink-0',
+        // Phone overlay pads itself for the iOS status bar; on desktop the shell already does.
+        'fixed inset-0 z-40 flex flex-col border-l bg-card md:relative md:inset-auto md:z-auto md:h-full md:shrink-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:pt-0 md:pb-0',
         expanded ? 'md:w-[calc(100vw-14rem)]' : 'md:w-[var(--drawer-w)]',
       )}
       style={{ '--drawer-w': `${width}px` }}
