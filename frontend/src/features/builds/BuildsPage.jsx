@@ -18,7 +18,7 @@ import { RunList } from '@/features/runs/RunList';
 import { RunStatusBadge } from '@/features/runs/RunStatusBadge';
 import { ComboPicker } from '@/features/runs/ComboPicker';
 import { isActive, toIso } from '@/features/runs/runStatus';
-import { deployEnvOf } from '@/features/builds/buildArgs';
+import { argsToValues, deployEnvOf, tagParamOf } from '@/features/builds/buildArgs';
 import { NewBuildSheet } from '@/features/builds/NewBuildSheet';
 import { RunDetail } from '@/features/builds/RunDetail';
 
@@ -152,7 +152,10 @@ export default function BuildsPage() {
         (prev) => {
           const next = new URLSearchParams(prev);
           if (open) next.set('new', '1');
-          else next.delete('new');
+          else {
+            next.delete('new');
+            next.delete('from');
+          }
           return next;
         },
         { replace: true },
@@ -186,10 +189,17 @@ export default function BuildsPage() {
 
   const base = `/builds/${encodeURIComponent(project)}`;
   const inDetail = num != null;
+  const fromNum = search.get('from');
+  const fromRun = fromNum != null ? runs.find((r) => r.type === 'build' && r.build_number === Number(fromNum)) : undefined;
+  // Tags already built (loaded runs) so "Rebuild with next tag" never reuses one.
+  const tagParam = tagParamOf(def.params || []);
+  const knownTags = tagParam
+    ? runs.filter((r) => r.type === 'build').map((r) => argsToValues(def.params, r.args_json)[tagParam.name]).filter(Boolean)
+    : [];
 
   let detail;
   if (selected) {
-    detail = <RunDetail key={selected.id} project={project} run={selected} params={def.params || []} targets={targetsQ.data || []} />;
+    detail = <RunDetail key={selected.id} project={project} run={selected} params={def.params || []} targets={targetsQ.data || []} knownTags={knownTags} />;
   } else if (singleQ.isError) {
     detail = (
       <Empty title={`Run #${selectedNum} not found`}>
@@ -258,7 +268,7 @@ export default function BuildsPage() {
           {detail}
         </section>
       </div>
-      <NewBuildSheet project={project} def={def} open={sheetOpen} onOpenChange={setSheetOpen} onStarted={(n) => navigate(`${base}/${n}`)} />
+      <NewBuildSheet project={project} def={def} fromRun={fromRun} open={sheetOpen} onOpenChange={setSheetOpen} onStarted={(n) => navigate(`${base}/${n}`)} />
     </div>
   );
 }

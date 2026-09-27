@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router';
 import { AlertTriangle, ArrowLeft, ChevronDown, RotateCcw, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cancelBuildRun, replayBuildRun } from '@/lib/api';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { cancelBuildRun, replayBuildRun, startBuild } from '@/lib/api';
 import { qk } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { RunLog } from '@/features/runs/RunLog';
@@ -11,7 +12,7 @@ import { RunStatusBadge } from '@/features/runs/RunStatusBadge';
 import { isActive, toIso } from '@/features/runs/runStatus';
 import { useRunCommand } from '@/features/runs/useRunCommand';
 import { useRunStream } from '@/features/runs/useRunStream';
-import { parseArgs, parseDeployMeta, parseJsonArray } from '@/features/builds/buildArgs';
+import { argsToValues, buildArgs, nextTag, parseArgs, parseDeployMeta, parseJsonArray, tagParamOf } from '@/features/builds/buildArgs';
 import { DeployBar } from '@/features/builds/DeployBar';
 
 const formatStarted = (s) => (s ? new Date(toIso(s)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
@@ -29,7 +30,7 @@ function Rows({ rows }) {
   );
 }
 
-export function RunDetail({ project, run, params, targets }) {
+export function RunDetail({ project, run, params, targets, knownTags = [] }) {
   const navigate = useNavigate();
   const runCommand = useRunCommand();
   const stream = useRunStream('build', run.id, { project, active: isActive(run.status) });
@@ -89,6 +90,21 @@ export function RunDetail({ project, run, params, targets }) {
     if (r) navigate(`${base}/${r.buildNumber}`);
   };
 
+  const tagParam = run.type === 'build' ? tagParamOf(params) : null;
+  const values = tagParam ? argsToValues(params, merged.args_json) : null;
+  const bumped = tagParam && values[tagParam.name] ? nextTag(values[tagParam.name], knownTags) : '';
+
+  const rebuildNextTag = async () => {
+    const r = await runCommand({
+      pending: `Starting a build of ${bumped}…`,
+      success: (res) => `Build #${res.buildNumber} ${res.queued ? 'queued' : 'started'} as ${bumped}`,
+      failure: `Could not build ${bumped}`,
+      fn: () => startBuild(project, merged.branch, buildArgs(params, { ...values, [tagParam.name]: bumped })),
+      invalidate: [qk.buildRuns(project)],
+    });
+    if (r) navigate(`${base}/${r.buildNumber}`);
+  };
+
   const title = run.type === 'clone' ? 'clone' : run.type === 'deploy' ? `deploy · ${merged.branch || ''}` : merged.branch || 'build';
 
   return (
@@ -107,7 +123,16 @@ export function RunDetail({ project, run, params, targets }) {
             <Button variant="outline" className="h-10 text-bad" onClick={cancel}><Square className="size-4" /> Cancel run</Button>
           )}
           {run.type === 'build' && !isActive(status) && (
-            <Button variant="outline" className="h-10" onClick={rebuild}><RotateCcw className="size-4" /> Rebuild</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-10"><RotateCcw className="size-4" /> Rebuild <ChevronDown className="size-4 opacity-60" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={rebuild}>Same parameters</DropdownMenuItem>
+                {bumped && <DropdownMenuItem onSelect={rebuildNextTag}>Next tag: {bumped}</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={() => navigate({ search: `?new=1&from=${n}` })}>Change parameters…</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

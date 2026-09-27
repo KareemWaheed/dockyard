@@ -91,3 +91,49 @@ export function deployEnvOf(run) {
   if (run?.type !== 'deploy') return '';
   return deployArgs(run)?.env || '';
 }
+
+// Form values from a finished run's args (inverse of buildArgs); unknown/malformed args fall back to defaults.
+export function argsToValues(params = [], argsJson) {
+  const args = parseJsonArray(argsJson);
+  const values = initFormState(params);
+  for (const p of params) {
+    if (p.type === 'checkbox') {
+      values[p.name] = args.includes(p.flag);
+    } else if (p.type === 'multiselect') {
+      values[p.name] = args.filter((a, i) => i > 0 && args[i - 1] === p.flag);
+    } else {
+      const i = args.indexOf(p.flag);
+      if (i !== -1 && i + 1 < args.length) values[p.name] = args[i + 1];
+    }
+  }
+  return values;
+}
+
+// The image-tag param, if the project has one: a string param named or labelled "tag".
+export function tagParamOf(params = []) {
+  return params.find((p) => p.type === 'string' && /tag/i.test(`${p.name} ${p.label || ''}`)) ?? null;
+}
+
+// A trailing "-<digits>" is a build counter when it has 2+ digits or follows a dotted version
+// (dal-stg-1.0.0-2060, dal-stg-01). A single digit after a word (dal-stg-1) is part of the name.
+function splitCounter(tag) {
+  const m = /^(.*)-(\d+)$/.exec(tag);
+  if (!m) return null;
+  const [, base, digits] = m;
+  if (digits.length >= 2 || base.split('-').pop().includes('.')) return { base, n: Number(digits), width: digits.length };
+  return null;
+}
+
+// Next tag for "Rebuild with next tag": bump the counter past the highest known tag with the same base.
+export function nextTag(tag, knownTags = []) {
+  if (!tag) return '';
+  const own = splitCounter(tag);
+  const base = own ? own.base : tag;
+  const width = own ? own.width : 2;
+  let max = own ? own.n : 0;
+  for (const k of knownTags) {
+    const s = splitCounter(k);
+    if (s && s.base === base) max = Math.max(max, s.n);
+  }
+  return `${base}-${String(max + 1).padStart(width, '0')}`;
+}

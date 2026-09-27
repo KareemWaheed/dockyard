@@ -8,11 +8,11 @@ import { cloneRepo, fetchBranches, startBuild } from '@/lib/api';
 import { qk } from '@/lib/queries';
 import { ComboPicker } from '@/features/runs/ComboPicker';
 import { useRunCommand } from '@/features/runs/useRunCommand';
-import { buildArgs, initFormState, isFormValid } from '@/features/builds/buildArgs';
+import { argsToValues, buildArgs, initFormState, isFormValid } from '@/features/builds/buildArgs';
 import { loadRecent, saveRecent } from '@/features/builds/recentStore';
 import { ParamField } from '@/features/builds/ParamField';
 
-export function NewBuildSheet({ project, def, open, onOpenChange, onStarted }) {
+export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onStarted }) {
   const runCommand = useRunCommand();
   const params = def?.params || [];
   const branchesQ = useQuery({ queryKey: qk.branches(project), queryFn: () => fetchBranches(project), enabled: open && !!project, staleTime: 30000 });
@@ -22,11 +22,17 @@ export function NewBuildSheet({ project, def, open, onOpenChange, onStarted }) {
 
   useEffect(() => {
     if (!open) return;
-    const recent = loadRecent(project);
-    setValues(initFormState(params, recent?.values));
-    setBranch(recent?.branch || '');
-    // params come from the same project def; re-init only when the sheet opens or the project changes
-  }, [open, project]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (fromRun) {
+      // "Change parameters…" on a run: start from exactly what that run used.
+      setValues(argsToValues(params, fromRun.args_json));
+      setBranch(fromRun.branch || '');
+    } else {
+      const recent = loadRecent(project);
+      setValues(initFormState(params, recent?.values));
+      setBranch(recent?.branch || '');
+    }
+    // params come from the same project def; re-init only when the sheet opens or its source changes
+  }, [open, project, fromRun?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const branches = branchesQ.data?.branches || [];
   useEffect(() => {
@@ -105,7 +111,7 @@ export function NewBuildSheet({ project, def, open, onOpenChange, onStarted }) {
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
         <form onSubmit={submit} className="flex h-full flex-col">
           <SheetHeader className="border-b p-4">
-            <SheetTitle>New build — {def?.name}</SheetTitle>
+            <SheetTitle>New build — {def?.name}{fromRun ? ` (from #${fromRun.build_number})` : ''}</SheetTitle>
             <SheetDescription>Build and push a new image.</SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-auto p-4">{body}</div>

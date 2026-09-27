@@ -70,4 +70,15 @@ describe('NewBuildSheet', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('combobox', { name: 'Branch' })).toBeInTheDocument();
   });
+
+  it('prefills from a run when changing its parameters, ignoring recent values', async () => {
+    saveRecent('api', { branch: 'main', values: { tag: 'recent' } });
+    const fromRun = { id: 5, build_number: 41, type: 'build', branch: 'release/2', args_json: JSON.stringify(['--tag', 'dal-stg-01', '--env', 'prod', '--module', 'core']) };
+    renderWithProviders(<NewBuildSheet project="api" def={def} fromRun={fromRun} open onOpenChange={vi.fn()} onStarted={vi.fn()} />);
+    expect(await screen.findByRole('dialog', { name: /from #41/ })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Branch' })).toHaveTextContent('release/2');
+    expect(screen.getByRole('textbox', { name: /Tag/ })).toHaveValue('dal-stg-01');
+    expect(screen.getByRole('radio', { name: 'PROD' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('checkbox', { name: 'core' })).toBeChecked();
+  });
 });

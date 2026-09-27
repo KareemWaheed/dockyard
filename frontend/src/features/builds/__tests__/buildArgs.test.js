@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf } from '@/features/builds/buildArgs';
+import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, tagParamOf, argsToValues } from '@/features/builds/buildArgs';
 
 const params = [
   { name: 'tag', type: 'string', flag: '--tag', label: 'Tag', required: true },
@@ -72,5 +72,38 @@ describe('parseJsonArray / parseDeployMeta / deployEnvOf', () => {
     expect(deployEnvOf(run)).toBe('stage');
     expect(parseDeployMeta({ type: 'deploy', args_json: 'garbage' })).toEqual([]);
     expect(deployEnvOf({ type: 'build', args_json: '[]' })).toBe('');
+  });
+});
+
+describe('nextTag (rebuild with next tag)', () => {
+  it('bumps a trailing build counter', () => {
+    expect(nextTag('dal-stg-1.0.0-2060')).toBe('dal-stg-1.0.0-2061');
+    expect(nextTag('dal-stg-01')).toBe('dal-stg-02');
+    expect(nextTag('1.4.0-9')).toBe('1.4.0-10');
+    expect(nextTag('app-099')).toBe('app-100');
+  });
+  it('starts a counter when the tag has none', () => {
+    expect(nextTag('dal-stg-1')).toBe('dal-stg-1-01');
+    expect(nextTag('dal-stg')).toBe('dal-stg-01');
+  });
+  it('continues from the highest known tag with the same base so tags are never reused', () => {
+    expect(nextTag('dal-stg-1.0.0-2060', ['dal-stg-1.0.0-2070', 'dal-prod-1.0.0-9000'])).toBe('dal-stg-1.0.0-2071');
+    expect(nextTag('dal-stg', ['dal-stg-01', 'dal-stg-03'])).toBe('dal-stg-04');
+  });
+  it('returns empty for an empty tag', () => {
+    expect(nextTag('')).toBe('');
+  });
+});
+
+describe('tagParamOf / argsToValues', () => {
+  it('finds the tag param by name or label', () => {
+    expect(tagParamOf(params).name).toBe('tag');
+    expect(tagParamOf([{ name: 'img', type: 'string', flag: '-t', label: 'Image tag' }]).name).toBe('img');
+    expect(tagParamOf([{ name: 'env', type: 'select', flag: '--env' }])).toBeNull();
+  });
+  it('reads a run back into form values', () => {
+    const json = JSON.stringify(['--tag', '1.2', '--env', 'prod', '--module', 'a', '--module', 'c', '--skip-tests']);
+    expect(argsToValues(params, json)).toEqual({ tag: '1.2', env: 'prod', mods: ['a', 'c'], skip: true });
+    expect(argsToValues(params, 'broken')).toEqual({ tag: '', env: 'dev', mods: [], skip: false });
   });
 });

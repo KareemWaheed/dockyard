@@ -52,11 +52,39 @@ describe('RunDetail', () => {
     await waitFor(() => expect(api.cancelBuildRun).toHaveBeenCalledWith('api', 41));
   });
 
-  it('rebuilds a finished run and navigates to the new one', async () => {
+  it('rebuilds a finished run with the same parameters and navigates to the new one', async () => {
     api.replayBuildRun.mockResolvedValue({ runId: 8, buildNumber: 42, queued: false });
     const { router } = renderWithProviders(<RunDetail project="api" run={{ ...build, status: 'failed' }} params={params} targets={[]} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Rebuild' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Rebuild' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Same parameters' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/builds/api/42'));
+  });
+
+  it('rebuilds with the next tag, counting past the highest known tag', async () => {
+    api.startBuild.mockResolvedValue({ runId: 9, buildNumber: 43, queued: false });
+    const run = { ...build, status: 'success', args_json: '["--tag","dal-stg-1.0.0-2060"]' };
+    const { router } = renderWithProviders(<RunDetail project="api" run={run} params={params} targets={[]} knownTags={['dal-stg-1.0.0-2064']} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Rebuild' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Next tag: dal-stg-1.0.0-2065' }));
+    await waitFor(() => expect(api.startBuild).toHaveBeenCalledWith('api', 'main', ['--tag', 'dal-stg-1.0.0-2065']));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/builds/api/43'));
+  });
+
+  it('opens the new build sheet prefilled from this run to change parameters', async () => {
+    const { router } = renderWithProviders(<RunDetail project="api" run={{ ...build, status: 'success' }} params={params} targets={[]} />, { path: '/builds/api/41' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Rebuild' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Change parameters…' }));
+    await waitFor(() => expect(router.state.location.search).toBe('?new=1&from=41'));
+  });
+
+  it('hides the next-tag option when the project has no tag parameter', async () => {
+    renderWithProviders(<RunDetail project="api" run={{ ...build, status: 'success' }} params={[]} targets={[]} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Rebuild' }));
+    await screen.findByRole('menuitem', { name: 'Same parameters' });
+    expect(screen.queryByRole('menuitem', { name: /Next tag/ })).toBeNull();
   });
 
   it('shows deployment details for deploy runs and survives malformed JSON (Review Focus 1)', () => {

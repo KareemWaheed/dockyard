@@ -112,4 +112,11 @@ describe('BuildsPage', () => {
     // The sidebar also links to Settings — check the one in the empty state.
     expect(within(screen.getByRole('main')).getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings');
   });
+
+  it('opens the sheet prefilled from a run with ?from and clears both params on close', async () => {
+    const { router } = renderApp('/builds/api/1?new=1&from=1');
+    expect(await screen.findByRole('dialog', { name: /New build — API \(from #1\)/ })).toBeInTheDocument();
+    await userEvent.setup().keyboard('{Escape}');
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+  });
 });
