@@ -13,6 +13,8 @@ beforeEach(() => {
   document.documentElement.classList.remove('dark');
   localStorage.clear();
   api.fetchSettingsServers.mockResolvedValue([{ env_key: 'stage' }, { env_key: 'prod' }]);
+  api.fetchProjects.mockResolvedValue({ api: { name: 'API' } });
+  api.fetchBuildRuns.mockResolvedValue({ runs: [], hasMore: false });
   api.fetchContainers.mockImplementation(async (env) => ({
     stacks: [{ name: 'Main', path: '/m', containers: [{ name: 'frontend', serviceName: 'frontend', image: `reg/fe:${env === 'prod' ? '1' : '2'}`, status: 'running', managed: true, stackPath: '/m' }] }],
     standalone: [],
@@ -50,5 +52,19 @@ describe('CommandPalette', () => {
     await user.keyboard('{Control>}k{/Control}');
     await user.click(await screen.findByRole('option', { name: 'Deploy frontend to STAGE…' }));
     await waitFor(() => expect(router.state.location.search).toBe('?open=stage%2Ffrontend&tab=deploy'));
+  });
+
+  it('opens a project on Builds and starts a new build', async () => {
+    const { router } = renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Overview' });
+    await user.keyboard('{Control>}k{/Control}');
+    await user.click(await screen.findByRole('option', { name: 'New build: API' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/builds/api'));
+    expect(router.state.location.search).toBe('?new=1');
+    await user.keyboard('{Escape}');
+    await user.keyboard('{Control>}k{/Control}');
+    await user.click(await screen.findByRole('option', { name: 'Builds: API' }));
+    await waitFor(() => expect(router.state.location.search).toBe(''));
   });
 });

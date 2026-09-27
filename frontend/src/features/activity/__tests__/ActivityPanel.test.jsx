@@ -40,4 +40,13 @@ describe('activity', () => {
     await user.click(await within(panel).findByRole('button', { name: /frontend.*1 → 2/ }));
     await waitFor(() => expect(router.state.location.search).toBe('?open=stage%2Ffrontend&tab=history'));
   });
+
+  it('links a running build straight to its run', async () => {
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Overview' });
+    await user.keyboard('a');
+    const panel = await screen.findByRole('complementary', { name: 'Activity' });
+    expect(await within(panel).findByRole('link', { name: /backend #89/ })).toHaveAttribute('href', '/builds/backend/89');
+  });
 });

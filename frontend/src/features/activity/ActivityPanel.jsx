@@ -9,8 +9,7 @@ import { qk } from '@/lib/queries';
 import { useLayout } from '@/app/layoutContext';
 import { useDrawer } from '@/features/container/useDrawer';
 import { useBuildActivity } from '@/features/activity/useBuildActivity';
-
-const toIso = (s) => (s && !s.includes('T') ? `${s.replace(' ', 'T')}Z` : s);
+import { toIso } from '@/features/runs/runStatus';
 
 export function ActivityPanel() {
   const { setActivityOpen } = useLayout();
@@ -39,7 +38,7 @@ export function ActivityPanel() {
             <ul className="space-y-1.5">
               {active.map((r) => (
                 <li key={`${r.project}-${r.id}`}>
-                  <Link to="/builds" className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted">
+                  <Link to={`/builds/${encodeURIComponent(r.project)}/${r.build_number}`} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted">
                     {r.status === 'running' ? <Loader2 className="size-3.5 animate-spin text-primary" /> : <StatusDot tone="warn" />}
                     <span>{r.project} #{r.build_number}</span>
                     <span className="truncate text-xs text-muted-foreground">{r.branch}</span>

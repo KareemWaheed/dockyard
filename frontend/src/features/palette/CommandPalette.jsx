@@ -1,12 +1,13 @@
 import { useNavigate, useLocation } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { StatusDot } from '@/components/status';
 import { flattenEnv, describeState } from '@/lib/containers';
 import { imageTag } from '@/lib/image';
-import { useAllEnvs } from '@/lib/queries';
+import { fetchProjects } from '@/lib/api';
+import { qk, useAllEnvs } from '@/lib/queries';
 import { useTheme } from '@/app/ThemeProvider';
 import { useLayout } from '@/app/layoutContext';
 import { useDrawer } from '@/features/container/useDrawer';
@@ -29,6 +30,8 @@ export function CommandPalette({ open, onOpenChange }) {
   const { toggleActivity } = useLayout();
   const { openDrawer } = useDrawer();
   const focused = useFocusedCell();
+  const projects = useQuery({ queryKey: qk.buildProjects, queryFn: fetchProjects, staleTime: 5 * 60000 });
+  const projectEntries = Object.entries(projects.data || {});
 
   const go = (fn) => () => {
     onOpenChange(false);
@@ -68,6 +71,20 @@ export function CommandPalette({ open, onOpenChange }) {
             <CommandItem key={path} value={`page ${label}`} onSelect={go(() => navigate(path))}>{label}</CommandItem>
           ))}
         </CommandGroup>
+        {projectEntries.length > 0 && (
+          <CommandGroup heading="Builds">
+            {projectEntries.map(([key, p]) => (
+              <CommandItem key={`builds-${key}`} value={`builds ${p.name || key}`} onSelect={go(() => navigate(`/builds/${encodeURIComponent(key)}`))}>
+                Builds: {p.name || key}
+              </CommandItem>
+            ))}
+            {projectEntries.map(([key, p]) => (
+              <CommandItem key={`new-${key}`} value={`new build ${p.name || key}`} onSelect={go(() => navigate(`/builds/${encodeURIComponent(key)}?new=1`))}>
+                New build: {p.name || key}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
         <CommandGroup heading="Actions">
           <CommandItem value="toggle theme dark light" onSelect={go(toggleTheme)}>Toggle theme</CommandItem>
           <CommandItem value="toggle compact rows density" onSelect={go(() => setDensity(density === 'compact' ? 'comfortable' : 'compact'))}>Toggle compact rows</CommandItem>
