@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router';
-import { Anchor, Database, Hammer, History, LayoutGrid, Moon, Rows3, Settings, Sun } from 'lucide-react';
+import { Database, Hammer, History, LayoutGrid, Moon, Rows3, Settings, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DockyardLogo } from '@/components/DockyardLogo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusDot, toneText } from '@/components/status';
 import { useTheme } from '@/app/ThemeProvider';
@@ -36,7 +37,7 @@ export default function Sidebar({ onNavigate }) {
   return (
     <nav aria-label="Main" className="flex h-full w-full flex-col p-3">
       <div className="mb-3 flex items-center gap-2 px-2 text-[15px] font-semibold">
-        <Anchor className="size-4 text-primary" aria-hidden="true" /> Dockyard
+        <DockyardLogo className="size-6" /> Dockyard
       </div>
       <NavLink to="/" end className={itemClass} onClick={onNavigate}>
         <LayoutGrid className="size-4" aria-hidden="true" /> Overview

@@ -9,6 +9,7 @@ import { usePref } from '@/lib/storage';
 import ContainerDrawer from '@/features/container/ContainerDrawer';
 import { ActivityPanel } from '@/features/activity/ActivityPanel';
 import { CommandPalette } from '@/features/palette/CommandPalette';
+import { OfflineBanner } from '@/app/OfflineBanner';
 
 export default function AppLayout() {
   const [activityOpen, setActivityOpen] = usePref('activityOpen', false);
@@ -46,7 +47,7 @@ export default function AppLayout() {
 
   return (
     <LayoutContext.Provider value={layout}>
-      <div className="flex h-dvh overflow-hidden bg-background">
+      <div className="flex h-dvh overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         <aside className="hidden w-56 shrink-0 border-r bg-sidebar md:block">
           <Sidebar />
         </aside>
@@ -63,6 +64,7 @@ export default function AppLayout() {
             </Button>
             <span className="font-semibold">Dockyard</span>
           </div>
+          <OfflineBanner />
           <main className="min-h-0 flex-1 overflow-auto">
             <Outlet />
           </main>
