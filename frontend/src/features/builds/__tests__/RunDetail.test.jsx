@@ -100,4 +100,11 @@ describe('RunDetail', () => {
     renderWithProviders(<RunDetail project="my app" run={build} params={params} targets={[]} />);
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/builds/my%20app');
   });
+
+  it('lets the details tab row scroll sideways on phones without a vertical scrollbar', () => {
+    renderWithProviders(<RunDetail project="api" run={build} params={params} targets={[]} />);
+    const tabs = screen.getByRole('tablist');
+    expect(tabs.className).toContain('overflow-x-auto');
+    expect(tabs.className).toContain('overflow-y-hidden');
+  });
 });

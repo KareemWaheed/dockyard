@@ -145,7 +145,7 @@ export function RunDetail({ project, run, params, targets, knownTags = [] }) {
             Details <ChevronDown className={cn('size-4 transition-transform', showDetails && 'rotate-180')} />
           </Button>
           <Tabs defaultValue={tabs[0].value} className={cn(showDetails ? 'block' : 'hidden lg:block')}>
-            <TabsList className="max-w-full overflow-x-auto">
+            <TabsList className="max-w-full overflow-x-auto overflow-y-hidden">
               {tabs.map((t) => <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>)}
             </TabsList>
             {tabs.map((t) => (
