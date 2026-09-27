@@ -47,6 +47,9 @@ export default function AppLayout() {
 
   return (
     <LayoutContext.Provider value={layout}>
+      {/* Installed on iOS, the status bar is translucent with always-white text: give it a solid
+          dark strip so the text stays readable and nothing scrolls underneath it. 0px elsewhere. */}
+      <div data-status-bar aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-brand" />
       <div className="flex h-dvh overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         <aside className="hidden w-56 shrink-0 border-r bg-sidebar md:block">
           <Sidebar />
