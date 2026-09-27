@@ -1,4 +1,4 @@
-// Pure helpers for the build form and for reading finished runs. Ported from legacy/BuildView.jsx.
+// Pure helpers for the build form and for reading finished runs. Ported from the pre-rebuild Builds page.
 
 export function initFormState(params = [], saved = {}) {
   const state = {};
