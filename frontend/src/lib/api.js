@@ -494,3 +494,25 @@ export async function fetchDeploySuggestions(env, service, { image = "", current
 export function fetchVersionInfo(env, containerName, { stackPath, serviceName }) {
   return containerAction(env, containerName, "version-info", { stackPath, serviceName });
 }
+
+// Single build run with full log — throws Error with .status (404 when missing)
+export async function fetchBuildRun(project, buildNumber) {
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`);
+  if (!r.ok) {
+    const err = await readError(r);
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
+
+// Single flyway run with full log + env/db names — throws Error with .status
+export async function fetchFlywayRun(id) {
+  const r = await fetch(`${BASE}/flyway/runs/${id}`);
+  if (!r.ok) {
+    const err = await readError(r);
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}

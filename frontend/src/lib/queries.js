@@ -11,6 +11,14 @@ export const qk = {
   suggestions: (env, service, image, current) => ['suggestions', env, service, image, current],
   buildProjects: ['build-projects'],
   buildRuns: (project) => ['build-runs', project],
+  // Child of buildRuns(project): invalidating buildRuns(project) also refreshes the page's list.
+  buildRunPages: (project) => ['build-runs', project, 'pages'],
+  buildRun: (project, num) => ['build-run', project, num],
+  branches: (project) => ['branches', project],
+  caproverTargets: ['caprover-targets'],
+  flywayEnvs: ['flyway-envs'],
+  flywayRuns: ['flyway-runs'],
+  flywayRun: (id) => ['flyway-run', id],
   maintenance: (env) => ['maintenance', env],
 };
 
