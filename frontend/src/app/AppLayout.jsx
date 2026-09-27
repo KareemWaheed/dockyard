@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet } from 'react-router';
-import { Menu } from 'lucide-react';
+import { ArrowDown, Loader2, Menu } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import Sidebar from '@/app/Sidebar';
@@ -10,11 +11,16 @@ import ContainerDrawer from '@/features/container/ContainerDrawer';
 import { ActivityPanel } from '@/features/activity/ActivityPanel';
 import { CommandPalette } from '@/features/palette/CommandPalette';
 import { OfflineBanner } from '@/app/OfflineBanner';
+import { PULL_THRESHOLD, usePullToRefresh } from '@/app/usePullToRefresh';
 
 export default function AppLayout() {
   const [activityOpen, setActivityOpen] = usePref('activityOpen', false);
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const qc = useQueryClient();
+  const mainRef = useRef(null);
+  // Refetch what's on screen; the app itself (drawers, filters, open logs) stays as it is.
+  const { pull, refreshing } = usePullToRefresh(mainRef, () => qc.refetchQueries({ type: 'active' }));
   const toggleActivity = useCallback(() => setActivityOpen((o) => !o), [setActivityOpen]);
   const openPalette = useCallback(() => setPaletteOpen(true), [setPaletteOpen]);
   const layout = useMemo(
@@ -68,9 +74,29 @@ export default function AppLayout() {
             <span className="font-semibold">Dockyard</span>
           </div>
           <OfflineBanner />
-          <main className="min-h-0 flex-1 overflow-auto">
-            <Outlet />
-          </main>
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {(pull > 0 || refreshing) && (
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center"
+                style={{ transform: `translateY(${refreshing ? 12 : pull - 28}px)` }}
+              >
+                <span role="status" className="flex size-9 items-center justify-center rounded-full border bg-card shadow">
+                  {refreshing ? (
+                    <Loader2 className="size-4 animate-spin text-primary" aria-label="Refreshing" />
+                  ) : (
+                    <ArrowDown
+                      className="size-4 text-muted-foreground transition-transform"
+                      style={{ transform: pull >= PULL_THRESHOLD ? 'rotate(180deg)' : undefined }}
+                      aria-label={pull >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}
+                    />
+                  )}
+                </span>
+              </div>
+            )}
+            <main ref={mainRef} className="min-h-0 flex-1 overflow-auto overscroll-y-contain">
+              <Outlet />
+            </main>
+          </div>
         </div>
         {activityOpen && <ActivityPanel />}
         <ContainerDrawer />
