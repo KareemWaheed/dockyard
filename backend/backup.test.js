@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'namaa-backup-test-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.CONFIG_PATH = path.join(tmpDir, 'config.json');

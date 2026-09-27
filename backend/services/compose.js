@@ -40,10 +40,16 @@ function updateImageInCompose(composeContent, serviceName, newTag) {
   return yaml.dump(doc, { lineWidth: -1, quotingType: '"' });
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function updateEnvVar(envContent, varName, newValue) {
-  const re = new RegExp(`^(${varName}=).*$`, 'm');
+  const re = new RegExp(`^(${escapeRegExp(varName)}=).*$`, 'm');
   if (re.test(envContent)) {
-    return envContent.replace(re, `$1${newValue}`);
+    // A replacer function (not a "$1..." replacement pattern) so `$$`, `$'`,
+    // `$&`, etc. in newValue are never interpreted as special substitutions.
+    return envContent.replace(re, (_match, prefix) => prefix + newValue);
   }
   // Variable not present — append it
   const trailing = envContent.endsWith('\n') ? '' : '\n';
@@ -137,6 +143,43 @@ function buildServiceBlock(def) {
   return yaml.dump(doc, { lineWidth: -1, quotingType: '"' });
 }
 
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// Returns an error message, or null when every change is safe to write.
+function validateEnvChanges(changes) {
+  if (!Array.isArray(changes) || changes.length === 0) return 'changes must contain at least one { key, value }';
+  for (const c of changes) {
+    if (!c || typeof c.key !== 'string' || !ENV_KEY_RE.test(c.key)) return `Invalid key: ${c && c.key}`;
+    if (typeof c.value !== 'string') return `Value for ${c.key} must be a string`;
+    if (/[\r\n]/.test(c.value)) return `Value for ${c.key} must not contain a newline`;
+  }
+  return null;
+}
+
+// Applies each change to the compose file or .env, matching the single-key
+// behavior of update-env: keys whose compose entry references ${…} live in .env.
+function applyEnvChanges(composeContent, envContent, serviceName, changes) {
+  const service = yaml.load(composeContent).services?.[serviceName];
+  if (!service) throw new Error(`Service ${serviceName} not found`);
+  let compose = composeContent;
+  let envOut = envContent;
+  let composeChanged = false;
+  let envChanged = false;
+  for (const { key, value } of changes) {
+    const entry = Array.isArray(service.environment)
+      ? service.environment.find((e) => typeof e === 'string' && e.startsWith(`${key}=`))
+      : service.environment?.[key];
+    if (typeof entry === 'string' && entry.includes('${')) {
+      envOut = updateEnvVar(envOut, key, value);
+      envChanged = true;
+    } else {
+      compose = addEnvVarToCompose(compose, serviceName, key, value);
+      composeChanged = true;
+    }
+  }
+  return { compose: composeChanged ? compose : null, env: envChanged ? envOut : null };
+}
+
 module.exports = {
   detectMode,
   extractVarName,
@@ -149,4 +192,6 @@ module.exports = {
   setManagedLabelInCompose,
   appendService,
   buildServiceBlock,
+  validateEnvChanges,
+  applyEnvChanges,
 };

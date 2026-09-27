@@ -23,6 +23,13 @@ COPY --from=backend-build /app .
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/http.d/default.conf
 
+# Stamp the deployed commit into a static file the frontend fetches, so the
+# dashboard can show which build is actually running (same build-info.json
+# convention used by the FE apps Dockyard itself monitors).
+ARG GIT_SHA=unknown
+ARG GIT_BRANCH=unknown
+RUN echo "{\"commit\":\"${GIT_SHA}\",\"shortCommit\":\"$(echo "$GIT_SHA" | cut -c1-7)\",\"branch\":\"${GIT_BRANCH}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /usr/share/nginx/html/build-info.json
+
 # Bundle app-provided scripts
 COPY scripts/aws-sg.sh /scripts/aws-sg.sh
 RUN chmod +x /scripts/aws-sg.sh

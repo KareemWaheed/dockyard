@@ -2,13 +2,20 @@ services:
   dockyard:
     image: kareemwaheed/dockyard:latest
     restart: unless-stopped
+    privileged: true
+    pid: host
     environment:
+      # Required: 64 hex chars (openssl rand -hex 32). Compose refuses to start without it.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to 64 hex characters, e.g. openssl rand -hex 32}
+      # Public URL(s) allowed to open WebSockets (logs/builds/flyway). Only needed
+      # if a proxy rewrites the Host header so it no longer matches the browser's Origin.
+      # - CORS_ORIGIN=https://dockyard.example.com
       # Minutes of silence before a build is flagged as possibly stuck (default: 15)
       # BUILD_STUCK_ALERT_MINUTES: 15
       # Minutes of silence before a build is auto-cancelled (default: 30)
       # BUILD_STUCK_CANCEL_MINUTES: 30
     ports:
-      - "3000:80"
+      - "127.0.0.1:80:80"
     volumes:
       - ./secret-keys:/app/secret-keys:ro
       # Mount your custom build scripts (optional, for the Build feature):

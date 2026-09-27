@@ -1,12 +1,22 @@
 const router = require('express').Router();
 const db = require('../db');
 const { connect, exec, readFile, writeFile } = require('../services/ssh');
-const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose } = require('../services/compose');
+const { detectMode, extractVarName, updateImageInCompose, updateEnvVar, addEnvVarToCompose, setManagedLabelInCompose, validateEnvChanges, applyEnvChanges } = require('../services/compose');
+const { parseVersionInfo } = require('../services/docker');
 const { setNote } = require('../notes');
 const { getNote } = require('../notes');
 const { writeHistory } = require('../services/history');
 const { notifyDeploy } = require('../services/notify');
 const path = require('path').posix;
+const { decryptField } = require('../encryption');
+const { shellQuote, isValidName } = require('../services/shell');
+const { composeCmd, INVALID_COMPOSE_CMD } = require('../services/validate');
+
+// Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+function isValidTag(tag) {
+  return typeof tag === 'string' && TAG_RE.test(tag);
+}
 
 const MANAGED_PASSWORD_ENV_KEYS = ['NAMAA_MANAGED_PASSWORD', 'DOCKYARD_MANAGED_PASSWORD'];
 
@@ -15,10 +25,10 @@ function getServerConfig(server) {
     host: server.host,
     ssh: {
       username: server.ssh_username,
-      password: server.ssh_password || undefined,
+      password: decryptField(server.ssh_password) || undefined,
       privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
+      privateKey: server.ssh_key_content ? Buffer.from(decryptField(server.ssh_key_content), 'base64') : undefined,
+      passphrase: decryptField(server.ssh_passphrase) || undefined,
     },
   };
 }
@@ -30,27 +40,32 @@ function readManagedPasswordFromAppEnv() {
   return null;
 }
 
+// Every action that runs compose commands or writes files must target a stack
+// configured for this server — never an arbitrary path from the request body.
+router.post('/:env/:containerName/:action', (req, res, next) => {
+  if (req.params.action === 'note') return next();
+  const server = db.prepare('SELECT id FROM servers WHERE env_key = ?').get(req.params.env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${req.params.env}` });
+  const { stackPath, serviceName } = req.body || {};
+  if (!isValidName(serviceName)) return res.status(400).json({ error: 'Invalid service name' });
+  const stack = db.prepare('SELECT id FROM compose_stacks WHERE server_id = ? AND path = ?').get(server.id, stackPath);
+  if (!stack) return res.status(400).json({ error: 'Unknown stack path for this environment' });
+  next();
+});
+
 router.post('/:env/:containerName/restart', async (req, res) => {
   const { env, containerName } = req.params;
   const { stackPath, serviceName, stackName = '' } = req.body;
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" restart "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} restart ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'restart', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'restart', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -66,22 +81,14 @@ router.post('/:env/:containerName/stop', async (req, res) => {
   const { stackPath, serviceName, stackName = '' } = req.body;
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" stop "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} stop ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'stop', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'stop', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -97,23 +104,15 @@ router.post('/:env/:containerName/up', async (req, res) => {
   const { stackPath, serviceName, forceRecreate, stackName = '' } = req.body;
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
     const flag = forceRecreate ? '--force-recreate' : '';
-    await exec(conn, `${dc} -f "${stackPath}" up -d ${flag} "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${flag} ${shellQuote(serviceName)}`);
     const upAction = forceRecreate ? 'force-recreate' : 'up';
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: upAction, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: upAction, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -131,23 +130,15 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   const { stackPath, serviceName, stackName = '' } = req.body;
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
-    await exec(conn, `${dc} -f "${stackPath}" pull "${serviceName}"`);
-    await exec(conn, `${dc} -f "${stackPath}" up -d --force-recreate "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} pull ${shellQuote(serviceName)}`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d --force-recreate ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'pull-recreate', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'pull-recreate', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -166,7 +157,8 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
   if (!stackPath || !serviceName) return res.status(400).json({ error: 'stackPath and serviceName are required' });
 
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   const action = enabled ? 'set-managed' : 'unset-managed';
@@ -185,7 +177,7 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
     const composeContent = await readFile(conn, stackPath);
     const updatedCompose = setManagedLabelInCompose(composeContent, serviceName, !!enabled);
     await writeFile(conn, stackPath, updatedCompose);
-    await exec(conn, `${dc} -f "${stackPath}" up -d "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${shellQuote(serviceName)}`);
 
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -200,19 +192,12 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
 router.post('/:env/:containerName/update-tag', async (req, res) => {
   const { env, containerName } = req.params;
   const { stackPath, serviceName, newTag, note, stackName = '' } = req.body;
+  if (!isValidTag(newTag)) return res.status(400).json({ error: 'Invalid image tag' });
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -236,7 +221,7 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
       const updated = updateImageInCompose(composeContent, serviceName, newTag);
       await writeFile(conn, stackPath, updated);
     }
-    await exec(conn, `${dc} -f "${stackPath}" up -d --pull always --force-recreate "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d --pull always --force-recreate ${shellQuote(serviceName)}`);
     if (note !== undefined) setNote(env, containerName, note);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-tag', oldTag, newTag, success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'update-tag', fromTag: oldTag, toTag: newTag, durationMs: Date.now() - startTime, success: true }).catch(() => {});
@@ -250,43 +235,30 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
 
 router.post('/:env/:containerName/update-env', async (req, res) => {
   const { env, containerName } = req.params;
-  const { stackPath, serviceName, key, value, stackName = '' } = req.body;
+  const { stackPath, serviceName, stackName = '' } = req.body;
+  const changes = Array.isArray(req.body.changes)
+    ? req.body.changes
+    : [{ key: req.body.key, value: req.body.value }];
+  const invalid = validateEnvChanges(changes);
+  if (invalid) return res.status(400).json({ error: invalid });
+
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
-  const serverCfg = {
-    host: server.host,
-    ssh: {
-      username: server.ssh_username,
-      password: server.ssh_password || undefined,
-      privateKeyPath: server.ssh_key_path || undefined,
-      privateKey: server.ssh_key_content ? Buffer.from(server.ssh_key_content, 'base64') : undefined,
-      passphrase: server.ssh_passphrase || undefined,
-    },
-  };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
     const conn = await connect(env, serverCfg);
     const composeContent = await readFile(conn, stackPath);
-    const composeDoc = require('js-yaml').load(composeContent);
-    const service = composeDoc.services?.[serviceName];
-    const envEntry = Array.isArray(service?.environment)
-      ? service.environment.find(e => e.startsWith(`${key}=`))
-      : service?.environment?.[key];
+    const envPath = path.join(path.dirname(stackPath), '.env');
+    const envContent = await readFile(conn, envPath).catch(() => '');
+    const out = applyEnvChanges(composeContent, envContent, serviceName, changes);
+    if (out.env !== null) await writeFile(conn, envPath, out.env);
+    if (out.compose !== null) await writeFile(conn, stackPath, out.compose);
 
-    if (envEntry && typeof envEntry === 'string' && envEntry.includes('${')) {
-      // env-file mode
-      const envPath = path.join(path.dirname(stackPath), '.env');
-      const envContent = await readFile(conn, envPath).catch(() => '');
-      const updated = updateEnvVar(envContent, key, value);
-      await writeFile(conn, envPath, updated);
-    } else {
-      const updated = addEnvVarToCompose(composeContent, serviceName, key, value);
-      await writeFile(conn, stackPath, updated);
-    }
-
-    await exec(conn, `${dc} -f "${stackPath}" up -d "${serviceName}"`);
+    await exec(conn, `${dc} -f ${shellQuote(stackPath)} up -d ${shellQuote(serviceName)}`);
     writeHistory({ env, containerName, serviceName, stackPath, stackName, action: 'update-env', success: true, durationMs: Date.now() - startTime, noteSnapshot });
     notifyDeploy({ env, container: containerName, action: 'update-env', durationMs: Date.now() - startTime, success: true }).catch(() => {});
     res.json({ ok: true });
@@ -302,6 +274,32 @@ router.post('/:env/:containerName/note', async (req, res) => {
   const { note } = req.body;
   setNote(env, containerName, note);
   res.json({ ok: true });
+});
+
+// Fetched on demand (badge click), not on every container-list poll — see
+// note in routes/servers.js on why this isn't baked into GET /containers.
+router.post('/:env/:containerName/version-info', async (req, res) => {
+  const { env } = req.params;
+  const { stackPath, serviceName } = req.body;
+  const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
+  if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
+
+  const stack = db.prepare('SELECT * FROM compose_stacks WHERE server_id = ? AND path = ?').get(server.id, stackPath);
+  let versionInfoCfg = {};
+  try { versionInfoCfg = JSON.parse(stack?.version_info_json || '{}'); } catch {}
+  const vi = versionInfoCfg[serviceName];
+  if (!vi?.path) return res.status(404).json({ error: 'No version info configured for this service' });
+
+  const serverCfg = getServerConfig(server);
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
+  try {
+    const conn = await connect(env, serverCfg);
+    const raw = await exec(conn, `${dc} -f ${shellQuote(stackPath)} exec -T ${shellQuote(serviceName)} cat ${shellQuote(vi.path)}`);
+    res.json(parseVersionInfo(raw, vi.format));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const { startFlywayRun, cancelRun } = require('../services/flyway-manager');
+const { encrypt, decryptField } = require('../encryption');
 
 // ── Environments ──────────────────────────────────────────────────────────────
 
@@ -11,7 +12,10 @@ router.get('/envs', (req, res) => {
   const databases = db.prepare('SELECT * FROM flyway_databases ORDER BY name').all();
   res.json(envs.map(e => ({
     ...e,
-    databases: databases.filter(d => d.env_id === e.id),
+    databases: databases.filter(d => d.env_id === e.id).map(d => ({
+      ...d,
+      db_password: decryptField(d.db_password),
+    })),
   })));
 });
 
@@ -52,10 +56,10 @@ router.post('/envs/:envId/databases', (req, res) => {
   const info = db.prepare(
     'INSERT INTO flyway_databases (env_id, name, url, db_user, db_password, schemas, locations, baseline_on_migrate, baseline_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
-    envId, name, url, db_user, db_password, schemas,
+    envId, name, url, db_user, encrypt(db_password), schemas,
     locations || 'filesystem:src/main/resources/db/migration/',
     baseline_on_migrate !== false ? 1 : 0,
-    baseline_version || '1'
+    baseline_version || '2'
   );
   res.json({ id: info.lastInsertRowid });
 });
@@ -70,10 +74,10 @@ router.put('/databases/:id', (req, res) => {
   if (db_password) {
     db.prepare(
       'UPDATE flyway_databases SET name=?, url=?, db_user=?, db_password=?, schemas=?, locations=?, baseline_on_migrate=?, baseline_version=? WHERE id=?'
-    ).run(name, url, db_user, db_password, schemas,
+    ).run(name, url, db_user, encrypt(db_password), schemas,
       locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate !== false ? 1 : 0,
-      baseline_version || '1',
+      baseline_version || '2',
       req.params.id);
   } else {
     db.prepare(
@@ -81,7 +85,7 @@ router.put('/databases/:id', (req, res) => {
     ).run(name, url, db_user, schemas,
       locations || 'filesystem:src/main/resources/db/migration/',
       baseline_on_migrate !== false ? 1 : 0,
-      baseline_version || '1',
+      baseline_version || '2',
       req.params.id);
   }
   res.json({ ok: true });
@@ -122,9 +126,15 @@ router.get('/runs', (req, res) => {
   res.json(runs);
 });
 
-// GET /api/flyway/runs/:id — single run with full log
+// GET /api/flyway/runs/:id — single run with full log (+ env/db names, like the list)
 router.get('/runs/:id', (req, res) => {
-  const run = db.prepare('SELECT * FROM flyway_runs WHERE id = ?').get(req.params.id);
+  const run = db.prepare(`
+    SELECT r.*, e.name as env_name, d.name as db_name
+    FROM flyway_runs r
+    LEFT JOIN flyway_envs e ON e.id = r.env_id
+    LEFT JOIN flyway_databases d ON d.id = r.db_id
+    WHERE r.id = ?
+  `).get(req.params.id);
   if (!run) return res.status(404).json({ error: 'Run not found' });
   res.json(run);
 });

@@ -1,16 +1,23 @@
 // backend/services/build-manager.js
-const { EventEmitter } = require('events');
-const db = require('../db');
-const { spawnBuild, spawnClone, checkoutAndPull, getRecentCommits } = require('./git');
+const { EventEmitter } = require("events");
+const db = require("../db");
+const {
+  spawnBuild,
+  spawnClone,
+  checkoutAndPull,
+  getRecentCommits,
+} = require("./git");
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
-const STUCK_ALERT_MS  = parseInt(process.env.BUILD_STUCK_ALERT_MINUTES  || '15', 10) * 60_000;
-const STUCK_CANCEL_MS = parseInt(process.env.BUILD_STUCK_CANCEL_MINUTES || '30', 10) * 60_000;
+const STUCK_ALERT_MS =
+  parseInt(process.env.BUILD_STUCK_ALERT_MINUTES || "15", 10) * 60_000;
+const STUCK_CANCEL_MS =
+  parseInt(process.env.BUILD_STUCK_CANCEL_MINUTES || "30", 10) * 60_000;
 
 const lastActivityAt = new Map(); // runId → Date
-const alertedRuns    = new Set(); // runIds that have already triggered an alert
+const alertedRuns = new Set(); // runIds that have already triggered an alert
 
 // runId → ChildProcess
 const activeProcesses = new Map();
@@ -19,38 +26,83 @@ const activeProcesses = new Map();
 // maps to 'cancelled' rather than 'failed', avoiding a double-finishRun race.
 const cancelledRuns = new Set();
 
+// runId → AbortController for CapRover deploy runs, which have no OS process —
+// cancelling aborts the status-watch loop instead.
+const deployAborters = new Map();
+
 // Global build queue — only one build runs at a time.
-const buildQueue = [];   // [{ project, branch, args, awsEnv, runId, buildNumber }]
+const buildQueue = []; // [{ project, branch, args, awsEnv, runId, buildNumber }]
 let buildRunning = false;
 
 function nextBuildNumber(project) {
-  const row = db.prepare(
-    'SELECT MAX(build_number) as n FROM build_runs WHERE project = ?'
-  ).get(project);
+  const row = db
+    .prepare("SELECT MAX(build_number) as n FROM build_runs WHERE project = ?")
+    .get(project);
   return (row.n || 0) + 1;
 }
 
 function appendLog(runId, chunk) {
-  db.prepare('UPDATE build_runs SET log = log || ? WHERE id = ?').run(chunk, runId);
+  db.prepare("UPDATE build_runs SET log = log || ? WHERE id = ?").run(
+    chunk,
+    runId
+  );
   lastActivityAt.set(runId, new Date());
   emitter.emit(`run:${runId}:chunk`, chunk);
 }
 
-function finishRun(runId, exitCode) {
+// The pushed image references are a contract with the build scripts: they print
+// a `::PUSHED_IMAGE::<uri>` sentinel per pushed image (BE builds push several
+// modules/tags per run). Fall back to the human-readable "Docker image <uri>
+// pushed successfully!" line for repos whose build script lacks the sentinel.
+function extractPushedImages(log) {
+  const sentinels = [...log.matchAll(/::PUSHED_IMAGE::(\S+)/g)].map(
+    (m) => m[1]
+  );
+  if (sentinels.length > 0) return [...new Set(sentinels)];
+  const legacy = [
+    ...log.matchAll(/Docker image (\S+) pushed successfully!/g),
+  ].map((m) => m[1]);
+  return [...new Set(legacy)];
+}
+
+// `status` overrides the exit-code mapping, e.g. "unverified" for a CapRover deploy whose
+// completion couldn't be observed.
+function finishRun(runId, exitCode, { status: statusOverride } = {}) {
   if (!activeProcesses.has(runId) && !cancelledRuns.has(runId)) return;
-  const runRow = db.prepare('SELECT type, project, build_number FROM build_runs WHERE id = ?').get(runId);
-  const status = cancelledRuns.has(runId) ? 'cancelled'
-    : exitCode === 0 ? 'success' : 'failed';
+  const runRow = db
+    .prepare("SELECT type, project, build_number FROM build_runs WHERE id = ?")
+    .get(runId);
+  const status = cancelledRuns.has(runId)
+    ? "cancelled"
+    : statusOverride
+    ? statusOverride
+    : exitCode === 0
+    ? "success"
+    : "failed";
   cancelledRuns.delete(runId);
   db.prepare(
     "UPDATE build_runs SET status = ?, exit_code = ?, finished_at = datetime('now') WHERE id = ?"
   ).run(status, exitCode, runId);
+  if (status === "success" && runRow?.type === "build") {
+    const logRow = db
+      .prepare("SELECT log FROM build_runs WHERE id = ?")
+      .get(runId);
+    const pushedImages = extractPushedImages(logRow?.log || "");
+    if (pushedImages.length > 0) {
+      db.prepare(
+        "UPDATE build_runs SET pushed_images_json = ? WHERE id = ?"
+      ).run(JSON.stringify(pushedImages), runId);
+    }
+  }
   activeProcesses.delete(runId);
   lastActivityAt.delete(runId);
   alertedRuns.delete(runId);
-  if (runRow) console.log(`[BUILD] Build #${runRow.build_number} for ${runRow.project} finished — status: ${status}, exit: ${exitCode}`);
+  if (runRow)
+    console.log(
+      `[BUILD] Build #${runRow.build_number} for ${runRow.project} finished — status: ${status}, exit: ${exitCode}`
+    );
   emitter.emit(`run:${runId}:done`, { exitCode, status });
-  if (runRow?.type === 'build') _dequeueNext();
+  if (runRow?.type === "build") _dequeueNext();
 }
 
 function _dequeueNext() {
@@ -59,22 +111,31 @@ function _dequeueNext() {
     return;
   }
   buildRunning = true;
-  const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
-  db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
-  console.log(`[QUEUE] Dequeued build #${buildNumber} for ${project}, queue depth: ${buildQueue.length}`);
+  const { project, branch, args, awsEnv, runId, buildNumber } =
+    buildQueue.shift();
+  db.prepare(
+    "UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?"
+  ).run(runId);
+  console.log(
+    `[QUEUE] Dequeued build #${buildNumber} for ${project}, queue depth: ${buildQueue.length}`
+  );
   _runBuild(project, branch, args, awsEnv, runId, buildNumber);
 }
 
 // Internal: execute a build that has already been inserted into build_runs.
 // Called both for immediate runs and when dequeuing.
 function _runBuild(project, branch, args, awsEnv, runId, buildNumber) {
-  const cfgRow = db.prepare("SELECT value_json FROM app_config WHERE key = 'projects'").get();
+  const cfgRow = db
+    .prepare("SELECT value_json FROM app_config WHERE key = 'projects'")
+    .get();
   const projects = cfgRow ? JSON.parse(cfgRow.value_json) : {};
   const proj = projects[project];
   if (!proj) {
     appendLog(runId, `ERROR: Project '${project}' not found\n`);
-    db.prepare("UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?").run(runId);
-    emitter.emit(`run:${runId}:done`, { exitCode: 1, status: 'failed' });
+    db.prepare(
+      "UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?"
+    ).run(runId);
+    emitter.emit(`run:${runId}:done`, { exitCode: 1, status: "failed" });
     _dequeueNext();
     return;
   }
@@ -84,39 +145,56 @@ function _runBuild(project, branch, args, awsEnv, runId, buildNumber) {
     checkoutAndPull(project, branch);
   } catch (err) {
     appendLog(runId, `ERROR: ${err.message}\n`);
-    db.prepare("UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?").run(runId);
-    emitter.emit(`run:${runId}:done`, { exitCode: 1, status: 'failed' });
+    db.prepare(
+      "UPDATE build_runs SET status = 'failed', exit_code = 1, finished_at = datetime('now') WHERE id = ?"
+    ).run(runId);
+    emitter.emit(`run:${runId}:done`, { exitCode: 1, status: "failed" });
     _dequeueNext();
     return;
   }
 
   const commits = getRecentCommits(project);
-  db.prepare('UPDATE build_runs SET commits_json = ? WHERE id = ?').run(JSON.stringify(commits), runId);
+  const commitsJson = JSON.stringify(commits);
+  db.prepare("UPDATE build_runs SET commits_json = ? WHERE id = ?").run(
+    commitsJson,
+    runId
+  );
+  emitter.emit(`run:${runId}:meta`, { commits_json: commitsJson, branch });
 
   appendLog(runId, `Running ${proj.buildScript}...\n`);
   activeProcesses.set(runId, null);
   const proc = spawnBuild(
-    project, proj.buildScript, args,
+    project,
+    proj.buildScript,
+    args,
     (chunk) => appendLog(runId, chunk),
     (code) => finishRun(runId, code),
     awsEnv
   );
   activeProcesses.set(runId, proc);
-  if (proc?.pid) console.log(`[BUILD] Starting build #${buildNumber} for ${project} — branch: ${branch}, PID: ${proc.pid}`);
+  if (proc?.pid)
+    console.log(
+      `[BUILD] Starting build #${buildNumber} for ${project} — branch: ${branch}, PID: ${proc.pid}`
+    );
 }
 
 function startBuildRun(project, branch, args, awsEnv) {
   const buildNumber = nextBuildNumber(project);
-  const status = buildRunning ? 'queued' : 'running';
+  const status = buildRunning ? "queued" : "running";
 
-  const info = db.prepare(
-    "INSERT INTO build_runs (project, build_number, type, status, branch, args_json, started_at) VALUES (?, ?, 'build', ?, ?, ?, datetime('now'))"
-  ).run(project, buildNumber, status, branch, JSON.stringify(args));
+  const info = db
+    .prepare(
+      "INSERT INTO build_runs (project, build_number, type, status, branch, args_json, started_at) VALUES (?, ?, 'build', ?, ?, ?, datetime('now'))"
+    )
+    .run(project, buildNumber, status, branch, JSON.stringify(args));
   const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
 
   if (buildRunning) {
     buildQueue.push({ project, branch, args, awsEnv, runId, buildNumber });
-    console.log(`[QUEUE] Build #${buildNumber} for ${project} queued at position ${buildQueue.length}`);
+    console.log(
+      `[QUEUE] Build #${buildNumber} for ${project} queued at position ${buildQueue.length}`
+    );
     return { runId, buildNumber, queued: true };
   }
 
@@ -125,17 +203,98 @@ function startBuildRun(project, branch, args, awsEnv) {
   return { runId, buildNumber, queued: false };
 }
 
+// CapRover deploys are first-class runs (type 'deploy') so they get streaming
+// logs, history and the watchdog for free. They don't enter the build queue —
+// like clones, they don't compete for the single-build lock.
+// Provenance: branch + commits_json are copied from the source build run, and
+// args_json records the source build number, target and image — so any deploy
+// in the history answers "which build/branch/commit, what image, deployed where".
+function startCapRoverDeployRun(
+  project,
+  target,
+  imageName,
+  gitHash,
+  sourceRun
+) {
+  const { deployImage } = require("./caprover");
+  const buildNumber = nextBuildNumber(project);
+  const info = db
+    .prepare(
+      "INSERT INTO build_runs (project, build_number, type, status, branch, commits_json, args_json, started_at) VALUES (?, ?, 'deploy', 'running', ?, ?, ?, datetime('now'))"
+    )
+    .run(
+      project,
+      buildNumber,
+      sourceRun?.branch || null,
+      sourceRun?.commits_json || null,
+      JSON.stringify({
+        sourceBuildNumber: sourceRun?.build_number ?? null,
+        env: target.env_key,
+        caproverUrl: target.caprover_url,
+        app: target.app_name,
+        image: imageName,
+        gitHash: gitHash || null,
+      })
+    );
+  const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
+
+  // Placeholder so cancelRun/finishRun treat it as active. There is no OS
+  // process to kill — cancelling aborts the watch loop via deployAborters
+  // (the deploy itself continues server-side on CapRover).
+  activeProcesses.set(runId, null);
+  const aborter = new AbortController();
+  deployAborters.set(runId, aborter);
+  console.log(
+    `[DEPLOY] Starting CapRover deploy #${buildNumber} for ${project} — ${imageName} → ${target.app_name} (${target.env_key})`
+  );
+  if (sourceRun) {
+    appendLog(
+      runId,
+      `Source: build #${sourceRun.build_number}${
+        sourceRun.branch ? ` on ${sourceRun.branch}` : ""
+      }\n`
+    );
+  }
+
+  deployImage({
+    caproverUrl: target.caprover_url,
+    appName: target.app_name,
+    appToken: target.app_token,
+    imageName,
+    gitHash,
+    signal: aborter.signal,
+    onLog: (chunk) => appendLog(runId, chunk),
+  })
+    .then((result) => finishRun(runId, 0, result?.verified === false ? { status: "unverified" } : {}))
+    .catch((err) => {
+      // Cancellation already logged "[Cancelled by user]" — no ERROR line.
+      if (err.name !== "AbortError") {
+        appendLog(runId, `ERROR: ${err.message}\n`);
+      }
+      finishRun(runId, 1);
+    })
+    .finally(() => deployAborters.delete(runId));
+
+  return { runId, buildNumber };
+}
+
 function startCloneRun(project, repoUrl, token) {
   const buildNumber = nextBuildNumber(project);
-  const info = db.prepare(
-    "INSERT INTO build_runs (project, build_number, type, status, started_at) VALUES (?, ?, 'clone', 'running', datetime('now'))"
-  ).run(project, buildNumber);
+  const info = db
+    .prepare(
+      "INSERT INTO build_runs (project, build_number, type, status, started_at) VALUES (?, ?, 'clone', 'running', datetime('now'))"
+    )
+    .run(project, buildNumber);
   const runId = info.lastInsertRowid;
+  lastActivityAt.set(runId, new Date());
 
   appendLog(runId, `Cloning ${repoUrl}...\n`);
   activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
   const proc = spawnClone(
-    project, repoUrl, token,
+    project,
+    repoUrl,
+    token,
     (chunk) => appendLog(runId, chunk),
     (code) => finishRun(runId, code)
   );
@@ -145,68 +304,104 @@ function startCloneRun(project, repoUrl, token) {
 
 function cancelRun(runId) {
   // If the run is waiting in the queue (not yet started), remove it directly.
-  const queueIdx = buildQueue.findIndex(j => j.runId === runId);
+  const queueIdx = buildQueue.findIndex((j) => j.runId === runId);
   if (queueIdx !== -1) {
     buildQueue.splice(queueIdx, 1);
-    const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
-    if (runRow) console.log(`[BUILD] Build #${runRow.build_number} for ${runRow.project} cancelled (was queued)`);
-    db.prepare("UPDATE build_runs SET status = 'cancelled', finished_at = datetime('now') WHERE id = ?").run(runId);
-    emitter.emit(`run:${runId}:done`, { exitCode: null, status: 'cancelled' });
+    const runRow = db
+      .prepare("SELECT project, build_number FROM build_runs WHERE id = ?")
+      .get(runId);
+    if (runRow)
+      console.log(
+        `[BUILD] Build #${runRow.build_number} for ${runRow.project} cancelled (was queued)`
+      );
+    db.prepare(
+      "UPDATE build_runs SET status = 'cancelled', finished_at = datetime('now') WHERE id = ?"
+    ).run(runId);
+    emitter.emit(`run:${runId}:done`, { exitCode: null, status: "cancelled" });
     return true;
   }
 
   if (!activeProcesses.has(runId)) return false;
   const proc = activeProcesses.get(runId);
   cancelledRuns.add(runId);
-  appendLog(runId, '\n[Cancelled by user]\n');
+  appendLog(runId, "\n[Cancelled by user]\n");
+  const aborter = deployAborters.get(runId);
+  if (aborter) {
+    aborter.abort();
+    return true;
+  }
   if (proc) {
     try {
-      process.kill(-proc.pid, 'SIGTERM');
+      process.kill(-proc.pid, "SIGTERM");
     } catch {
-      proc.kill('SIGTERM');
+      proc.kill("SIGTERM");
     }
   }
   return true;
 }
 
-function subscribeRun(runId, onChunk, onDone, onStuckAlert) {
+function subscribeRun(runId, onChunk, onDone, onStuckAlert, onMeta) {
   const chunkKey = `run:${runId}:chunk`;
-  const doneKey  = `run:${runId}:done`;
+  const doneKey = `run:${runId}:done`;
   const stuckKey = `run:${runId}:stuck_alert`;
+  const metaKey = `run:${runId}:meta`;
 
   const doneWrapper = (result) => {
     emitter.off(chunkKey, onChunk);
     if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
+    if (onMeta) emitter.off(metaKey, onMeta);
     onDone(result);
   };
 
   emitter.on(chunkKey, onChunk);
   emitter.once(doneKey, doneWrapper);
   if (onStuckAlert) emitter.on(stuckKey, onStuckAlert);
+  if (onMeta) emitter.on(metaKey, onMeta);
 
   return () => {
     emitter.off(chunkKey, onChunk);
     emitter.off(doneKey, doneWrapper);
     if (onStuckAlert) emitter.off(stuckKey, onStuckAlert);
+    if (onMeta) emitter.off(metaKey, onMeta);
   };
 }
 
 function hydrateQueue() {
-  const queued = db.prepare(
-    "SELECT id, project, build_number, branch, args_json FROM build_runs WHERE status = 'queued' ORDER BY id ASC"
-  ).all();
+  const queued = db
+    .prepare(
+      "SELECT id, project, build_number, branch, args_json FROM build_runs WHERE status = 'queued' ORDER BY id ASC"
+    )
+    .all();
   if (queued.length === 0) return;
 
   for (const row of queued) {
-    const args = (() => { try { return JSON.parse(row.args_json || '[]'); } catch { return []; } })();
-    buildQueue.push({ project: row.project, branch: row.branch, args, awsEnv: {}, runId: row.id, buildNumber: row.build_number });
+    const args = (() => {
+      try {
+        return JSON.parse(row.args_json || "[]");
+      } catch {
+        return [];
+      }
+    })();
+    buildQueue.push({
+      project: row.project,
+      branch: row.branch,
+      args,
+      awsEnv: {},
+      runId: row.id,
+      buildNumber: row.build_number,
+    });
   }
-  console.log(`[QUEUE] Re-hydrated ${queued.length} queued build(s) from DB on startup`);
+  console.log(
+    `[QUEUE] Re-hydrated ${queued.length} queued build(s) from DB on startup`
+  );
 
   // Kick off the first one — rest will dequeue naturally via _dequeueNext.
   buildRunning = true;
-  const { project, branch, args, awsEnv, runId, buildNumber } = buildQueue.shift();
-  db.prepare("UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?").run(runId);
+  const { project, branch, args, awsEnv, runId, buildNumber } =
+    buildQueue.shift();
+  db.prepare(
+    "UPDATE build_runs SET status = 'running', started_at = datetime('now') WHERE id = ?"
+  ).run(runId);
   _runBuild(project, branch, args, awsEnv, runId, buildNumber);
 }
 
@@ -218,24 +413,46 @@ setInterval(() => {
     const silence = now - last.getTime();
 
     if (silence >= STUCK_CANCEL_MS) {
-      const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
+      const runRow = db
+        .prepare("SELECT project, build_number FROM build_runs WHERE id = ?")
+        .get(runId);
       const mins = Math.floor(silence / 60_000);
       appendLog(runId, `\n[Auto-cancelled: no output for ${mins} minutes]\n`);
-      console.log(`[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — auto-cancelled after ${mins}m of silence`);
+      console.log(
+        `[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — auto-cancelled after ${mins}m of silence`
+      );
       const proc = activeProcesses.get(runId);
       cancelledRuns.add(runId);
       if (proc) {
-        try { process.kill(-proc.pid, 'SIGTERM'); } catch { proc.kill('SIGTERM'); }
+        try {
+          process.kill(-proc.pid, "SIGTERM");
+        } catch {
+          proc.kill("SIGTERM");
+        }
       }
     } else if (silence >= STUCK_ALERT_MS && !alertedRuns.has(runId)) {
-      const runRow = db.prepare('SELECT project, build_number FROM build_runs WHERE id = ?').get(runId);
+      const runRow = db
+        .prepare("SELECT project, build_number FROM build_runs WHERE id = ?")
+        .get(runId);
       const mins = Math.floor(silence / 60_000);
-      appendLog(runId, `\n[WARNING: no output for ${mins} minutes — build may be stuck]\n`);
+      appendLog(
+        runId,
+        `\n[WARNING: no output for ${mins} minutes — build may be stuck]\n`
+      );
       emitter.emit(`run:${runId}:stuck_alert`);
       alertedRuns.add(runId);
-      console.log(`[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — no output for ${mins}m, alert sent`);
+      console.log(
+        `[WATCHDOG] Build #${runRow?.build_number} for ${runRow?.project} — no output for ${mins}m, alert sent`
+      );
     }
   }
 }, 60_000);
 
-module.exports = { startBuildRun, startCloneRun, cancelRun, subscribeRun, hydrateQueue };
+module.exports = {
+  startBuildRun,
+  startCloneRun,
+  startCapRoverDeployRun,
+  cancelRun,
+  subscribeRun,
+  hydrateQueue,
+};

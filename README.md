@@ -18,16 +18,16 @@ So I built Dockyard: a thin dashboard that sits on top of your existing SSH acce
 
 ## How It Compares
 
-| | Dockyard | Portainer | Yacht | Cockpit |
-|---|---|---|---|---|
-| No agent on target servers | ✅ SSH only | ❌ Requires agent | ❌ Requires agent | ❌ Requires agent |
-| Multi-server (dev/stage/prod) | ✅ | ✅ Business tier | ❌ | ✅ |
-| Works with existing compose files | ✅ | ⚠️ Reimports stacks | ✅ | ❌ |
-| Edit env vars / image tags in UI | ✅ | ⚠️ Limited | ❌ | ❌ |
-| Parameterized build & push | ✅ | ❌ | ❌ | ❌ |
-| Deploy history | ✅ | ❌ | ❌ | ❌ |
-| Webhook / email notifications | ✅ | ❌ | ❌ | ❌ |
-| Self-hosted, fully open source | ✅ | ✅ CE | ✅ | ✅ |
+|                                   | Dockyard    | Portainer           | Yacht             | Cockpit           |
+| --------------------------------- | ----------- | ------------------- | ----------------- | ----------------- |
+| No agent on target servers        | ✅ SSH only | ❌ Requires agent   | ❌ Requires agent | ❌ Requires agent |
+| Multi-server (dev/stage/prod)     | ✅          | ✅ Business tier    | ❌                | ✅                |
+| Works with existing compose files | ✅          | ⚠️ Reimports stacks | ✅                | ❌                |
+| Edit env vars / image tags in UI  | ✅          | ⚠️ Limited          | ❌                | ❌                |
+| Parameterized build & push        | ✅          | ❌                  | ❌                | ❌                |
+| Deploy history                    | ✅          | ❌                  | ❌                | ❌                |
+| Webhook / email notifications     | ✅          | ❌                  | ❌                | ❌                |
+| Self-hosted, fully open source    | ✅          | ✅ CE               | ✅                | ✅                |
 
 **The key difference:** Dockyard uses plain SSH — it reads and writes your actual `docker-compose.yml` and `.env` files directly. There is no separate stack state to sync, no agent to install, and no Docker socket exposure. If you can already SSH into your servers, Dockyard works.
 
@@ -38,6 +38,7 @@ So I built Dockyard: a thin dashboard that sits on top of your existing SSH acce
 - **Environment variable editing** — modify env vars inline in compose files or in `.env` files
 - **Live log streaming** — tail container logs in real time via WebSocket
 - **Build & push** — dynamic parameterized builds: define projects and their CLI params in Settings, clone a Git repo, run your build script with the assembled flags, stream output to the browser
+- **CapRover deploys** — one click deploys an image pushed by a successful build to a CapRover app (per project + environment targets, app-token auth). The deploy carries the build's git hash so CapRover's version history shows real commit provenance
 - **Deploy history** — every action is logged with before/after state
 - **Notifications** — webhook and email alerts on deploys
 - **Add services** — add new containers to a compose stack from the UI
@@ -128,16 +129,16 @@ Select an environment (dev / staging / prod) from the sidebar. Dockyard connects
 
 Each container shows its image tag, status, and action buttons:
 
-| Button | Action |
-|---|---|
-| `↻` Restart | `docker compose restart <service>` |
-| `▶` Up | `docker compose up -d <service>` |
-| `■` Stop | `docker compose stop <service>` |
-| `⚡` Force recreate | `up -d --force-recreate` (current image) |
-| `⤓` Pull & recreate | Pull latest for current tag, then recreate |
-| Tag badge | Update the image tag (edits `docker-compose.yml` or `.env`) |
-| `Env` | Edit environment variables inline |
-| `Logs` | Stream live logs in a panel |
+| Button              | Action                                                      |
+| ------------------- | ----------------------------------------------------------- |
+| `↻` Restart         | `docker compose restart <service>`                          |
+| `▶` Up              | `docker compose up -d <service>`                            |
+| `■` Stop            | `docker compose stop <service>`                             |
+| `⚡` Force recreate | `up -d --force-recreate` (current image)                    |
+| `⤓` Pull & recreate | Pull latest for current tag, then recreate                  |
+| Tag badge           | Update the image tag (edits `docker-compose.yml` or `.env`) |
+| `Env`               | Edit environment variables inline                           |
+| `Logs`              | Stream live logs in a panel                                 |
 
 ### Build & Push
 
@@ -158,6 +159,7 @@ All configuration after first run is done through Settings:
 - **Build Projects** — manage project definitions and build param schemas
 - **Notifications** — configure webhook or email alerts on deploys
 - **AWS** — set credentials and Security Group IDs for the IP whitelist tool
+- **CapRover** — map build projects + environments to CapRover apps (URL, app name, app token) for one-click image deploys from the Build view
 
 ## Architecture
 
