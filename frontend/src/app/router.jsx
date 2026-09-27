@@ -3,8 +3,8 @@ import AppLayout from '@/app/AppLayout';
 import OverviewPage from '@/features/overview/OverviewPage';
 import EnvPage from '@/features/env/EnvPage';
 import BuildsPage, { BuildsIndex } from '@/features/builds/BuildsPage';
+import MigrationsPage from '@/features/migrations/MigrationsPage';
 import LegacyScope from '@/legacy/LegacyScope';
-import FlywayView from '@/legacy/FlywayView';
 import HistoryView from '@/legacy/HistoryView';
 import SettingsView from '@/legacy/SettingsView';
 
@@ -33,7 +33,8 @@ export const routes = [
       { path: 'builds', element: <BuildsIndex /> },
       { path: 'builds/:project', element: <BuildsPage /> },
       { path: 'builds/:project/:num', element: <BuildsPage /> },
-      { path: 'migrations', element: legacy(FlywayView) },
+      { path: 'migrations', element: <MigrationsPage /> },
+      { path: 'migrations/:runId', element: <MigrationsPage /> },
       { path: 'history', element: legacy(HistoryView) },
       { path: 'settings', element: legacy(SettingsView) },
       { path: '*', element: <NotFound /> },
