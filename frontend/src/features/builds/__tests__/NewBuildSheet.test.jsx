@@ -81,4 +81,17 @@ describe('NewBuildSheet', () => {
     expect(screen.getByRole('radio', { name: 'PROD' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('checkbox', { name: 'core' })).toBeChecked();
   });
+
+  it('starts only one clone when Clone is tapped twice (cubic #36)', async () => {
+    api.fetchBranches.mockResolvedValue({ branches: [], needsClone: true });
+    let finish;
+    api.cloneRepo.mockImplementation(() => new Promise((r) => { finish = r; }));
+    renderWithProviders(<NewBuildSheet project="api" def={def} open onOpenChange={vi.fn()} onStarted={vi.fn()} />);
+    const user = userEvent.setup();
+    const btn = await screen.findByRole('button', { name: 'Clone repository' });
+    await user.click(btn);
+    await user.click(btn);
+    expect(api.cloneRepo).toHaveBeenCalledTimes(1);
+    finish({ runId: 1, buildNumber: 1 });
+  });
 });

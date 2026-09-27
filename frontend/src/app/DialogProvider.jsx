@@ -59,7 +59,17 @@ export function DialogProvider({ children }) {
   const [request, setRequest] = useState(null);
   const [error, setError] = useState(null);
 
-  const confirm = useCallback((opts) => new Promise((resolve) => setRequest({ ...opts, resolve })), []);
+  // A new request cancels one still open, so the earlier caller's promise never hangs.
+  const confirm = useCallback(
+    (opts) =>
+      new Promise((resolve) =>
+        setRequest((prev) => {
+          prev?.resolve({ ok: false });
+          return { ...opts, resolve };
+        }),
+      ),
+    [],
+  );
   const showError = useCallback((title, message) => setError({ title, message }), []);
   const value = useMemo(() => ({ confirm, showError }), [confirm, showError]);
 

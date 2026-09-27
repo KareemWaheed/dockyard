@@ -97,4 +97,20 @@ describe('useRunStream', () => {
       vi.useRealTimers();
     }
   });
+
+  it('does not loop reconnecting when the server keeps answering with an error (cubic #52)', () => {
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      renderHook(() => useRunStream('build', 12, { project: 'api', active: true }), { wrapper });
+      act(() => { FakeSocket.instances[0].emit({ type: 'error', message: 'Run not found' }); FakeSocket.instances[0].onclose(); });
+      act(() => vi.advanceTimersByTime(1500));
+      expect(FakeSocket.instances).toHaveLength(2);
+      act(() => { FakeSocket.instances[1].emit({ type: 'error', message: 'Run not found' }); FakeSocket.instances[1].onclose(); });
+      act(() => vi.advanceTimersByTime(10000));
+      expect(FakeSocket.instances).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

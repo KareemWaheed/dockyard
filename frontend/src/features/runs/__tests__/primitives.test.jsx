@@ -16,6 +16,7 @@ describe('runStatus', () => {
     expect(isActive('failed')).toBe(false);
     expect(toIso('2026-09-27 10:00:00')).toBe('2026-09-27T10:00:00Z');
     expect(toIso('2026-09-27T10:00:00.000Z')).toBe('2026-09-27T10:00:00.000Z');
+    expect(runStatusMeta('unverified')).toEqual({ tone: 'warn', label: 'Unverified' }); // CapRover deploy not confirmed
   });
   it('renders a labelled badge', () => {
     render(<RunStatusBadge status="failed" />);

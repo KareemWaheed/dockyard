@@ -93,12 +93,14 @@ export default function ContainerDrawer() {
     window.addEventListener('pointerup', up);
   };
 
-  const container = findContainer(q.data, open.container);
+  // While a new env loads, q.data still holds the previous env's containers (keepPreviousData):
+  // never show or act on those against the new env.
+  const container = q.isPlaceholderData ? null : findContainer(q.data, open.container);
   // While the first load is in flight the shell can't carry its real accessible
   // name yet (no container to name it after) — keep it generic so consumers that
   // find the drawer by `${container} on ${env}` wait for the loaded state instead
   // of matching the transient loading shell.
-  const label = q.isLoading ? 'Loading container' : `${open.container} on ${open.env}`;
+  const label = q.isLoading || q.isPlaceholderData ? 'Loading container' : `${open.container} on ${open.env}`;
   const shellProps = { label, width, expanded, onResizeStart };
 
   const tabs = container ? drawerTabs(container, open.env) : [];

@@ -19,4 +19,9 @@ function isValidProjectKey(key) {
   return typeof key === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) && !key.includes('..');
 }
 
-module.exports = { COMPOSE_COMMANDS, INVALID_COMPOSE_CMD, isValidComposeCmd, composeCmd, isValidProjectKey };
+// Environment keys appear in URLs (/env/<key>) and API paths: letters, digits, dash, underscore.
+function isValidEnvKey(key) {
+  return typeof key === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(key);
+}
+
+module.exports = { COMPOSE_COMMANDS, INVALID_COMPOSE_CMD, isValidComposeCmd, composeCmd, isValidProjectKey, isValidEnvKey };

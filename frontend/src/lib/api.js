@@ -18,14 +18,14 @@ async function readError(r) {
 }
 
 export async function fetchContainers(env) {
-  const r = await fetch(`${BASE}/servers/${env}/containers`);
+  const r = await fetch(`${BASE}/servers/${encodeURIComponent(env)}/containers`);
   if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function containerAction(env, containerName, action, body) {
   const r = await fetch(
-    `${BASE}/containers/${env}/${encodeURIComponent(containerName)}/${action}`,
+    `${BASE}/containers/${encodeURIComponent(env)}/${encodeURIComponent(containerName)}/${action}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -49,13 +49,13 @@ export async function fetchProjects() {
 }
 
 export async function fetchProjectRemote(project) {
-  const r = await fetch(`${BASE}/builds/${project}/remote`);
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function updateProjectRemote(project, repoUrl) {
-  const r = await fetch(`${BASE}/builds/${project}/remote`, {
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repoUrl }),
@@ -69,7 +69,7 @@ export async function saveNote(env, containerName, note) {
 }
 
 export async function addService(env, stackIdx, body) {
-  const r = await fetch(`${BASE}/services/${env}/${stackIdx}`, {
+  const r = await fetch(`${BASE}/services/${encodeURIComponent(env)}/${stackIdx}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -195,13 +195,13 @@ async function streamWithSentinel(r, onChunk, onDone) {
 // ─── Maintenance ─────────────────────────────────────────────────────────────
 
 export async function getMaintenance(env) {
-  const r = await fetch(`${BASE}/maintenance/${env}`);
+  const r = await fetch(`${BASE}/maintenance/${encodeURIComponent(env)}`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function setMaintenance(env, enabled) {
-  const r = await fetch(`${BASE}/maintenance/${env}`, {
+  const r = await fetch(`${BASE}/maintenance/${encodeURIComponent(env)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -219,7 +219,7 @@ export async function fetchHistory(
   const params = new URLSearchParams({ limit, offset });
   if (container) params.set("container", container);
   const url = env
-    ? `${BASE}/history/${env}?${params}`
+    ? `${BASE}/history/${encodeURIComponent(env)}?${params}`
     : `${BASE}/history?${params}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(await r.text());
@@ -486,7 +486,7 @@ export async function cancelFlywayRun(id) {
 
 export async function fetchDeploySuggestions(env, service, { image = "", current = "" } = {}) {
   const params = new URLSearchParams({ image, current });
-  const r = await fetch(`${BASE}/deploy-suggestions/${env}/${encodeURIComponent(service)}?${params}`);
+  const r = await fetch(`${BASE}/deploy-suggestions/${encodeURIComponent(env)}/${encodeURIComponent(service)}?${params}`);
   if (!r.ok) throw await readError(r);
   return r.json();
 }

@@ -43,4 +43,22 @@ describe('DialogProvider.confirm', () => {
     await user.type(screen.getByLabelText('Managed password'), 's3cret{Enter}');
     expect(result).toEqual({ ok: true, password: 's3cret' });
   });
+
+  it('cancels a pending confirmation when another one is requested (cubic #28)', async () => {
+    const results = [];
+    function Two() {
+      const { confirm } = useDialogs();
+      const ask = () => {
+        confirm({ title: 'First?', description: 'd' }).then((r) => results.push(['first', r]));
+        confirm({ title: 'Second?', description: 'd' }).then((r) => results.push(['second', r]));
+      };
+      return <button onClick={ask}>two</button>;
+    }
+    render(<DialogProvider><Two /></DialogProvider>);
+    const user = userEvent.setup();
+    await user.click(screen.getByText('two'));
+    expect(await screen.findByRole('heading', { name: 'Second?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(results).toEqual([['first', { ok: false }], ['second', { ok: true, password: undefined }]]);
+  });
 });

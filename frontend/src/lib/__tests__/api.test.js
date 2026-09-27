@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import * as api from '@/lib/api';
 import { fetchBranches, fetchBuildRuns, startBuild, cloneRepo, cancelBuildRun, replayBuildRun, deployRunToCapRover } from '@/lib/api';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -25,6 +26,21 @@ describe('build API helpers encode the project key (Review Focus 4)', () => {
       `/api/builds/${enc}/runs/3`,
       `/api/builds/${enc}/runs/3/replay`,
       `/api/builds/${enc}/runs/3/deploy-caprover`,
+    ]);
+  });
+});
+
+describe('environment keys are encoded in API paths (cubic #57)', () => {
+  it('keeps an env key inside one path segment', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await api.fetchContainers('prod/blue');
+    await api.containerAction('prod/blue', 'web', 'restart', {});
+    await api.fetchHistory('prod/blue', { limit: 5 });
+    expect(fetchMock.mock.calls.map(([u]) => u.split('?')[0])).toEqual([
+      '/api/servers/prod%2Fblue/containers',
+      '/api/containers/prod%2Fblue/web/restart',
+      '/api/history/prod%2Fblue',
     ]);
   });
 });

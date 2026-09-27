@@ -61,7 +61,7 @@ export function CommandPalette({ open, onOpenChange }) {
         </CommandGroup>
         <CommandGroup heading="Environments">
           {envs.map((e) => (
-            <CommandItem key={e.env} value={`env ${e.env}`} onSelect={go(() => navigate(`/env/${e.env}`))}>
+            <CommandItem key={e.env} value={`env ${e.env}`} onSelect={go(() => navigate(`/env/${encodeURIComponent(e.env)}`))}>
               {e.env}
             </CommandItem>
           ))}

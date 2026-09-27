@@ -47,7 +47,7 @@ export default function Sidebar({ onNavigate }) {
       {envs.map((e) => {
         const s = envSummary(e);
         return (
-          <NavLink key={e.env} to={`/env/${e.env}`} className={itemClass} onClick={onNavigate}>
+          <NavLink key={e.env} to={`/env/${encodeURIComponent(e.env)}`} className={itemClass} onClick={onNavigate}>
             <StatusDot tone={s.tone} />
             <span className="flex-1">{e.env}</span>
             {s.status === 'loading' ? (

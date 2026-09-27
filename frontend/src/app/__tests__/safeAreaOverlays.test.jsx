@@ -51,4 +51,17 @@ describe('full-screen phone overlays keep clear of the iOS status bar', () => {
     expect(safe.className).toContain(BOTTOM);
     expect(screen.getByRole('button', { name: 'Close' }).className).toContain('top-[calc(env(safe-area-inset-top)+1rem)]');
   });
+
+  it('keeps side sheets below the status-bar strip (cubic #32)', () => {
+    render(
+      <Sheet open>
+        <SheetContent side="left"><SheetTitle>Menu</SheetTitle></SheetContent>
+      </Sheet>,
+    );
+    const content = document.querySelector('[data-slot="sheet-content"]');
+    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
+    expect(content.className).toContain('z-40');
+    expect(content.className).not.toContain('z-50');
+    expect(overlay.className).toContain('z-40');
+  });
 });

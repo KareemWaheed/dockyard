@@ -23,4 +23,9 @@ describe('computeDrift', () => {
   it('ignores non-present cells themselves', () => {
     expect(computeDrift(row({ dev: present('3'), test: { kind: 'absent' } }), ORDER)).toEqual({});
   });
+
+  it('does not offer a promote from an upstream env whose data is stale (cubic #12)', () => {
+    const d = computeDrift(row({ dev: { kind: 'present', tag: '3', stale: true }, test: present('2') }), ORDER);
+    expect(d).toEqual({});
+  });
 });

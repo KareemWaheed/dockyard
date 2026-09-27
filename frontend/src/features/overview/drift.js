@@ -8,6 +8,8 @@ export function computeDrift(row, envOrder) {
     for (let j = i - 1; j >= 0; j--) {
       const up = row.cells[envOrder[j]];
       if (up?.kind !== 'present') continue;
+      // Never offer to promote a tag read from an env whose data is out of date.
+      if (up.stale) return;
       if (up.tag !== cell.tag) drift[env] = { upstreamEnv: envOrder[j], upstreamTag: up.tag };
       return;
     }

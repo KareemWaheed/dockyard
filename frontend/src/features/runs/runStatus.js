@@ -4,6 +4,8 @@ const META = {
   success: { tone: 'ok', label: 'Success' },
   failed: { tone: 'bad', label: 'Failed' },
   cancelled: { tone: 'idle', label: 'Cancelled' },
+  // CapRover accepted the deploy but Dockyard couldn't observe it finishing.
+  unverified: { tone: 'warn', label: 'Unverified' },
 };
 
 export const runStatusMeta = (status) => META[status] ?? { tone: 'idle', label: status || 'Unknown' };

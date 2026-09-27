@@ -19,6 +19,7 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
   const [branch, setBranch] = useState('');
   const [values, setValues] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [cloning, setCloning] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +63,8 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
   };
 
   const clone = async () => {
+    if (cloning) return;
+    setCloning(true);
     const r = await runCommand({
       pending: `Cloning ${def.name}…`,
       success: (res) => (res.alreadyCloned ? 'Repository already cloned' : `Clone #${res.buildNumber} started`),
@@ -69,6 +72,7 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
       fn: () => cloneRepo(project),
       invalidate: [qk.buildRuns(project), qk.branches(project)],
     });
+    setCloning(false);
     if (r && !r.alreadyCloned) {
       onOpenChange(false);
       onStarted(r.buildNumber);
@@ -89,7 +93,7 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
     body = (
       <div className="space-y-3 text-sm">
         <p>This project's repository hasn't been cloned on the server yet.</p>
-        <Button type="button" className="h-10" onClick={clone}>Clone repository</Button>
+        <Button type="button" className="h-10" disabled={cloning} onClick={clone}>Clone repository</Button>
       </div>
     );
   } else {

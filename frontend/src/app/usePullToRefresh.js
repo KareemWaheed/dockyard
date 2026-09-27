@@ -17,7 +17,7 @@ function insideScrolledPanel(target, container) {
 export function usePullToRefresh(ref, onRefresh) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const state = useRef({ startY: null, pull: 0, refreshing: false });
+  const state = useRef({ startX: 0, startY: null, pull: 0, refreshing: false });
   const refreshRef = useRef(onRefresh);
   refreshRef.current = onRefresh;
 
@@ -33,12 +33,15 @@ export function usePullToRefresh(ref, onRefresh) {
     };
     const onStart = (e) => {
       if (s.refreshing || el.scrollTop > 0 || insideScrolledPanel(e.target, el)) return;
+      s.startX = e.touches[0].clientX ?? 0;
       s.startY = e.touches[0].clientY;
     };
     const onMove = (e) => {
       if (s.startY == null) return;
       const dy = e.touches[0].clientY - s.startY;
-      if (dy <= 0 || el.scrollTop > 0) {
+      const dx = (e.touches[0].clientX ?? s.startX) - s.startX;
+      // A sideways swipe (tabs, the overview matrix) isn't a pull, even with some downward drift.
+      if (dy <= 0 || Math.abs(dx) > dy || el.scrollTop > 0) {
         reset();
         return;
       }

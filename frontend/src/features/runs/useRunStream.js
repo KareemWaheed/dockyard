@@ -36,8 +36,10 @@ export function useRunStream(kind, runId, { project, active = false } = {}) {
     ws.onopen = () => setStatus('open');
     let retryTimer = null;
     ws.onmessage = (e) => {
-      autoRetried.current = false;
       const msg = JSON.parse(e.data);
+      // Real output re-arms the one automatic retry; an error reply (e.g. run not found) must
+      // not, or a permanent error would reconnect every second forever.
+      if (msg.type !== 'error') autoRetried.current = false;
       if (msg.type === 'chunk') {
         setStuck(false);
         setBuf((b) => appendChunk(b.lines, b.partial, msg.text));

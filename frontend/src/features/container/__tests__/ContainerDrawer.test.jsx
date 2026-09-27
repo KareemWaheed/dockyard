@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within, waitFor } from '@testing-library/react';
+import { screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as api from '@/lib/api';
 import { renderApp } from '@/test/renderApp';
@@ -101,5 +101,16 @@ describe('ContainerDrawer', () => {
   it('handles a URL naming a container that does not exist', async () => {
     renderApp('/?open=stage/ghost&tab=deploy');
     expect(await screen.findByText('Container not found in stage')).toBeInTheDocument();
+  });
+
+  it("never shows the previous environment's container while the new one loads (cubic #9)", async () => {
+    api.fetchSettingsServers.mockResolvedValue([{ env_key: 'stage' }, { env_key: 'prod' }]);
+    const stage = await api.fetchContainers('stage');
+    api.fetchContainers.mockImplementation((env) => (env === 'prod' ? new Promise(() => {}) : Promise.resolve(stage)));
+    const { router } = renderApp('/env/stage/web?tab=logs');
+    await drawer();
+    await act(() => router.navigate('/env/prod/web?tab=logs'));
+    await waitFor(() => expect(screen.getByRole('complementary', { name: 'Loading container' })).toBeInTheDocument());
+    expect(screen.queryByRole('tab', { name: 'Deploy' })).toBeNull();
   });
 });

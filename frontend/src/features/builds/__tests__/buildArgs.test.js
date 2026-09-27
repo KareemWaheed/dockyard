@@ -106,4 +106,19 @@ describe('tagParamOf / argsToValues', () => {
     expect(argsToValues(params, json)).toEqual({ tag: '1.2', env: 'prod', mods: ['a', 'c'], skip: true });
     expect(argsToValues(params, 'broken')).toEqual({ tag: '', env: 'dev', mods: [], skip: false });
   });
+
+describe('review fixes (cubic #37, #38)', () => {
+  it('only treats a whole-word "tag" parameter as the image tag', () => {
+    expect(tagParamOf([{ name: 'stage', type: 'string', flag: '--stage' }])).toBeNull();
+    expect(tagParamOf([{ name: 'staging_env', type: 'string', flag: '-s' }])).toBeNull();
+    expect(tagParamOf([{ name: 'imageTag', type: 'string', flag: '-t' }]).name).toBe('imageTag');
+    expect(tagParamOf([{ name: 'image_tag', type: 'string', flag: '-t' }]).name).toBe('image_tag');
+    expect(tagParamOf([{ name: 'v', type: 'string', flag: '-t', label: 'Docker tag' }]).name).toBe('v');
+  });
+  it('enforces a required checkbox', () => {
+    const p = [{ name: 'ack', type: 'checkbox', flag: '--ack', required: true }];
+    expect(isFormValid(p, { ack: false }, 'main')).toBe(false);
+    expect(isFormValid(p, { ack: true }, 'main')).toBe(true);
+  });
+});
 });

@@ -82,4 +82,17 @@ describe('pull to refresh in the app shell', () => {
     act(() => drag(main, 100, 100 + PULL_THRESHOLD * 3));
     await waitFor(() => expect(api.fetchSettingsServers).toHaveBeenCalledTimes(2));
   });
+
+  it('leaves sideways swipes alone even with some downward drift (cubic #31)', () => {
+    const onRefresh = vi.fn();
+    render(<Harness onRefresh={onRefresh} />);
+    const el = screen.getByTestId('scroller');
+    setScroll(el, 0);
+    fireEvent.touchStart(el, { touches: [{ clientX: 50, clientY: 100 }] });
+    fireEvent.touchMove(el, { touches: [{ clientX: 250, clientY: 140 }] });
+    fireEvent.touchMove(el, { touches: [{ clientX: 350, clientY: 300 }] });
+    expect(screen.getByTestId('state')).toHaveTextContent('pull:0');
+    fireEvent.touchEnd(el, { changedTouches: [{ clientX: 350, clientY: 300 }] });
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
 });

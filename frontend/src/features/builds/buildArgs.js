@@ -29,8 +29,9 @@ export function buildArgs(params = [], values = {}) {
 export function isFormValid(params = [], values = {}, branch = '') {
   if (!branch) return false;
   return params.every((p) => {
-    if (!p.required || p.type === 'checkbox') return true;
+    if (!p.required) return true;
     const val = values[p.name];
+    if (p.type === 'checkbox') return val === true;
     return p.type === 'multiselect' ? Array.isArray(val) && val.length > 0 : !!val;
   });
 }
@@ -110,8 +111,12 @@ export function argsToValues(params = [], argsJson) {
 }
 
 // The image-tag param, if the project has one: a string param named or labelled "tag".
+// Words in a name or label: splits on non-letters and camelCase ("imageTag" → image, tag).
+const words = (s) => (s || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+
 export function tagParamOf(params = []) {
-  return params.find((p) => p.type === 'string' && /tag/i.test(`${p.name} ${p.label || ''}`)) ?? null;
+  // Whole word only: "stage" or "staging" must not count as the image tag.
+  return params.find((p) => p.type === 'string' && [...words(p.name), ...words(p.label)].includes('tag')) ?? null;
 }
 
 // A trailing "-<digits>" is a build counter when it has 2+ digits or follows a dotted version

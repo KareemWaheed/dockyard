@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as api from '@/lib/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -75,5 +75,26 @@ describe('MigrationForm', () => {
     api.fetchBranches.mockResolvedValue({ branches: [], needsClone: true });
     renderWithProviders(<MigrationForm projects={projects} envs={envs} busy={false} onStarted={vi.fn()} />);
     expect(await screen.findByRole('link', { name: 'Builds' })).toHaveAttribute('href', '/builds/api');
+  });
+
+  it('keeps the chosen branch when the branch list refreshes (cubic #10)', async () => {
+    const { queryClient } = renderWithProviders(<MigrationForm projects={projects} envs={envs} busy={false} onStarted={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('combobox', { name: 'Branch' }));
+    await user.click(await screen.findByRole('option', { name: /develop/ }));
+    api.fetchBranches.mockResolvedValue({ branches: ['main', 'develop', 'feature/x'] });
+    await act(() => queryClient.refetchQueries({ queryKey: ['branches', 'api'] }));
+    expect(screen.getByRole('combobox', { name: 'Branch' })).toHaveTextContent('develop');
+  });
+
+  it('starts only one run when Info is double-clicked (cubic #11)', async () => {
+    let finish;
+    api.startFlywayRun.mockImplementation(() => new Promise((r) => { finish = r; }));
+    renderWithProviders(<MigrationForm projects={projects} envs={envs} busy={false} onStarted={vi.fn()} />);
+    const user = userEvent.setup();
+    await screen.findByRole('combobox', { name: 'Branch' });
+    await user.dblClick(screen.getByRole('button', { name: 'Info' }));
+    expect(api.startFlywayRun).toHaveBeenCalledTimes(1);
+    finish({ runId: 1, runNumber: 1 });
   });
 });

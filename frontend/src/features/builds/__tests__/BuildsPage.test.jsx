@@ -125,4 +125,15 @@ describe('BuildsPage', () => {
     renderApp('/builds/api/5?new=1&from=5');
     expect(await screen.findByRole('dialog', { name: /New build — API \(from #5\)/ })).toBeInTheDocument();
   });
+
+  it('counts "Next tag" past tags from runs older than the loaded page (cubic #35)', async () => {
+    api.fetchProjects.mockResolvedValue({ api: { name: 'API', params: [{ name: 'tag', type: 'string', flag: '--tag' }] } });
+    const recent = { id: 3, type: 'build', build_number: 3, status: 'success', branch: 'main', args_json: '["--tag","dal-01"]', started_at: '2026-09-27 10:00:00' };
+    const old = { id: 1, type: 'build', build_number: 1, status: 'success', branch: 'main', args_json: '["--tag","dal-07"]', started_at: '2026-09-20 10:00:00' };
+    api.fetchBuildRuns.mockImplementation(async (project, { limit } = {}) => (limit === 100 ? { runs: [recent, old], hasMore: false } : { runs: [recent], hasMore: true }));
+    renderApp('/builds/api/3');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rebuild' }));
+    expect(await screen.findByRole('menuitem', { name: 'Next tag: dal-08' })).toBeInTheDocument();
+  });
 });

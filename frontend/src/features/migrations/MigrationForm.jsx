@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -32,8 +32,9 @@ export function MigrationForm({ projects, envs, busy, onStarted }) {
   const branchesQ = useQuery({ queryKey: qk.branches(project), queryFn: () => fetchBranches(project), enabled: !!project, staleTime: 30000 });
   const branches = branchesQ.data?.branches || [];
   const needsClone = !!branchesQ.data?.needsClone;
+  // Keep the chosen branch across refreshes; only fall back to the first when it disappears.
   useEffect(() => {
-    setBranch(branches[0] || '');
+    setBranch((current) => (current && branches.includes(current) ? current : branches[0] || ''));
   }, [project, branchesQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const env = envs.find((e) => String(e.id) === envId);
@@ -46,8 +47,19 @@ export function MigrationForm({ projects, envs, busy, onStarted }) {
     setDbId(next?.databases[0] ? String(next.databases[0].id) : '');
   };
 
+  // Guard against double-clicks starting two Flyway processes before `busy` catches up.
+  const inFlight = useRef(false);
   const run = async (command) => {
-    if (!canRun) return;
+    if (!canRun || inFlight.current) return;
+    inFlight.current = true;
+    try {
+      await start(command);
+    } finally {
+      inFlight.current = false;
+    }
+  };
+
+  const start = async (command) => {
     const where = `${env.name} / ${database.name}`;
     const r = await runCommand({
       confirm:

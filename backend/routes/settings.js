@@ -3,7 +3,7 @@ const db = require("../db");
 const { disconnect } = require("../services/ssh");
 const { exportConfig, importConfig } = require("../services/backup");
 const { encrypt, decryptField } = require("../encryption");
-const { isValidComposeCmd, isValidProjectKey, INVALID_COMPOSE_CMD } = require('../services/validate');
+const { isValidComposeCmd, isValidProjectKey, isValidEnvKey, INVALID_COMPOSE_CMD } = require('../services/validate');
 
 const SENSITIVE_FIELDS = ["ssh_password", "ssh_key_content", "ssh_passphrase"];
 
@@ -43,6 +43,9 @@ router.post("/servers", (req, res) => {
     maintenance_flag_path,
     stacks,
   } = req.body;
+  if (!isValidEnvKey(env_key)) {
+    return res.status(400).json({ error: 'Environment key must use letters, digits, dash or underscore (e.g. stage, prod-eu).' });
+  }
   if (docker_compose_cmd != null && docker_compose_cmd !== '' && !isValidComposeCmd(docker_compose_cmd)) {
     return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   }

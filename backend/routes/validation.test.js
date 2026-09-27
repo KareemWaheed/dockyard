@@ -43,6 +43,12 @@ server.listen(0, async () => {
     r = await call(port, 'POST', '/api/settings/servers', { env_key: 'qa', name: 'qa', host: 'h', ssh_username: 'u', docker_compose_cmd: 'sudo docker compose' });
     assert.ok(r.status < 400, `allowed compose command must save (got ${r.status})`);
 
+    // Environment keys become URL path segments: reject ones with / ? # or spaces
+    r = await call(port, 'POST', '/api/settings/servers', { env_key: 'prod/blue', name: 'x', host: 'h', ssh_username: 'u' });
+    assert.strictEqual(r.status, 400, 'env key with a slash must be rejected');
+    r = await call(port, 'POST', '/api/settings/servers', { env_key: 'prod-blue_2', name: 'x', host: 'h', ssh_username: 'u' });
+    assert.ok(r.status < 400, `valid env key must save (got ${r.status})`);
+
     // A stored bad command never reaches SSH: the action is refused first
     r = await call(port, 'POST', '/api/containers/dev/web/restart', { stackPath: '/srv/app/docker-compose.yml', serviceName: 'web' });
     assert.strictEqual(r.status, 400, 'container action with a stored bad compose command must be refused');

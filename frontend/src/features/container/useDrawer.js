@@ -30,7 +30,7 @@ export function useDrawer() {
       if (onEnvPage) {
         const params = new URLSearchParams({ tab: nextTab });
         if (tag) params.set('tag', tag);
-        navigate(`/env/${env}/${encodeURIComponent(containerName)}?${params}`);
+        navigate(`/env/${encodeURIComponent(env)}/${encodeURIComponent(containerName)}?${params}`);
         return;
       }
       const next = new URLSearchParams(location.search);
@@ -55,7 +55,7 @@ export function useDrawer() {
 
   const closeDrawer = useCallback(() => {
     if (match) {
-      navigate(`/env/${match.params.env}`);
+      navigate(`/env/${encodeURIComponent(match.params.env)}`);
       return;
     }
     const next = new URLSearchParams(location.search);

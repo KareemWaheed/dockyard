@@ -127,6 +127,14 @@ export default function BuildsPage() {
     refetchInterval: 10000,
     enabled: !!def,
   });
+  // Wider window of history just for "Next tag", so it never reuses a tag from an older run.
+  // A child of qk.buildRuns(project): refreshed together with the list.
+  const tagHistoryQ = useQuery({
+    queryKey: [...qk.buildRuns(project), 'tag-history'],
+    queryFn: () => fetchBuildRuns(project, { limit: 100 }),
+    enabled: !!def && !!tagParamOf(def.params || []),
+    staleTime: 30000,
+  });
   const runs = runsQ.data?.pages.flatMap((p) => p.runs) ?? [];
   const shown = runs.filter(FILTERS[filter]);
   const queued = runs.filter((r) => r.status === 'queued').sort((a, b) => a.id - b.id);
@@ -198,7 +206,10 @@ export default function BuildsPage() {
   // Tags already built (loaded runs) so "Rebuild with next tag" never reuses one.
   const tagParam = tagParamOf(def.params || []);
   const knownTags = tagParam
-    ? runs.filter((r) => r.type === 'build').map((r) => argsToValues(def.params, r.args_json)[tagParam.name]).filter(Boolean)
+    ? [...runs, ...(tagHistoryQ.data?.runs || [])]
+        .filter((r) => r.type === 'build')
+        .map((r) => argsToValues(def.params, r.args_json)[tagParam.name])
+        .filter(Boolean)
     : [];
 
   let detail;
