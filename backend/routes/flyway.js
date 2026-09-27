@@ -126,9 +126,15 @@ router.get('/runs', (req, res) => {
   res.json(runs);
 });
 
-// GET /api/flyway/runs/:id — single run with full log
+// GET /api/flyway/runs/:id — single run with full log (+ env/db names, like the list)
 router.get('/runs/:id', (req, res) => {
-  const run = db.prepare('SELECT * FROM flyway_runs WHERE id = ?').get(req.params.id);
+  const run = db.prepare(`
+    SELECT r.*, e.name as env_name, d.name as db_name
+    FROM flyway_runs r
+    LEFT JOIN flyway_envs e ON e.id = r.env_id
+    LEFT JOIN flyway_databases d ON d.id = r.db_id
+    WHERE r.id = ?
+  `).get(req.params.id);
   if (!run) return res.status(404).json({ error: 'Run not found' });
   res.json(run);
 });
