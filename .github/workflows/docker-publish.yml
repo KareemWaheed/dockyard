@@ -2,8 +2,7 @@ name: Build & Push Docker Image
 
 on:
   push:
-    # feat/ui-rebuild publishes :latest only until it is merged (PR #2) — remove it then.
-    branches: [master, feat/ui-rebuild]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
