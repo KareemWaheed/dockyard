@@ -33,16 +33,44 @@ export function RunLog({ lines, status, onReconnect, fileName, emptyText, closed
   const term = search.trim().toLowerCase();
   const shown = term && matchesOnly ? lines.filter((l) => l.toLowerCase().includes(term)) : lines;
 
+  const followRef = useRef(follow);
+  followRef.current = follow;
+
   useEffect(() => {
     if (follow && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     // `lines` (not shown.length): once the 5,000-line cap is hit, its length
     // stops changing even though new lines keep arriving (oldest evicted) —
     // depend on the array reference so follow keeps working past the cap.
-  }, [lines, follow]);
+    // wrap/matchesOnly/term change the content height without new lines.
+  }, [lines, follow, wrap, matchesOnly, term]);
+
+  // Stay pinned to the end when the log area resizes while following — e.g. a finished
+  // run's details or deploy bar appear above the log after its output has loaded.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      if (followRef.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Only a scroll the user makes (wheel, touch, scrollbar drag, keys) stops following. The browser
+  // also moves scrollTop on its own when text re-wraps (drawer opening/resizing); that must not
+  // count as "the user scrolled up", or the log stops mid-way with "Jump to latest" showing.
+  const userScrollRef = useRef(false);
+  const markUserScroll = () => {
+    userScrollRef.current = true;
+  };
 
   const onScroll = () => {
     const el = bodyRef.current;
-    setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+    const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    if (atEnd) setFollow(true);
+    else if (userScrollRef.current) setFollow(false);
+    else if (followRef.current) el.scrollTop = el.scrollHeight;
+    userScrollRef.current = false;
   };
 
   const download = () => {
@@ -90,7 +118,12 @@ export function RunLog({ lines, status, onReconnect, fileName, emptyText, closed
         <div
           ref={bodyRef}
           onScroll={onScroll}
-          className={cn('absolute inset-0 overflow-auto rounded-md bg-muted p-2 font-mono text-xs leading-5', wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre')}
+          onWheel={markUserScroll}
+          onTouchMove={markUserScroll}
+          onPointerDown={markUserScroll}
+          onKeyDown={markUserScroll}
+          tabIndex={0}
+          className={cn('absolute inset-0 overflow-auto rounded-md [overflow-anchor:none] outline-none focus-visible:ring-2 focus-visible:ring-ring bg-muted p-2 font-mono text-xs leading-5', wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre')}
         >
           {shown.length === 0 && <span className="text-muted-foreground">{status === 'connecting' ? 'Connecting…' : emptyText}</span>}
           {shown.map((line, i) => (
