@@ -37,7 +37,7 @@ export async function containerAction(env, containerName, action, body) {
 }
 
 export async function fetchBranches(project) {
-  const r = await fetch(`${BASE}/builds/${project}/branches`);
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/branches`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -80,14 +80,14 @@ export async function addService(env, stackIdx, body) {
 
 // Starts a clone — returns { runId, buildNumber } or { alreadyCloned: true }
 export async function cloneRepo(project) {
-  const r = await fetch(`${BASE}/builds/${project}/clone`, { method: "POST" });
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/clone`, { method: "POST" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 // Starts a build — returns { runId, buildNumber }
 export async function startBuild(project, branch, args) {
-  const r = await fetch(`${BASE}/builds/${project}`, {
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ branch, args }),
@@ -99,7 +99,7 @@ export async function startBuild(project, branch, args) {
 // List runs for a project (no log content) — returns { runs, hasMore }
 export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
   const r = await fetch(
-    `${BASE}/builds/${project}/runs?offset=${offset}&limit=${limit}`,
+    `${BASE}/builds/${encodeURIComponent(project)}/runs?offset=${offset}&limit=${limit}`,
   );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -107,7 +107,7 @@ export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
 
 // Cancel a running build
 export async function cancelBuildRun(project, buildNumber) {
-  const r = await fetch(`${BASE}/builds/${project}/runs/${buildNumber}`, {
+  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`, {
     method: "DELETE",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -117,7 +117,7 @@ export async function cancelBuildRun(project, buildNumber) {
 // Replay a finished build with the same branch + args
 export async function replayBuildRun(project, buildNumber) {
   const r = await fetch(
-    `${BASE}/builds/${project}/runs/${buildNumber}/replay`,
+    `${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}/replay`,
     { method: "POST" },
   );
   if (!r.ok) throw new Error(await r.text());
@@ -357,7 +357,7 @@ export async function deployRunToCapRover(
   imageName,
 ) {
   const r = await fetch(
-    `${BASE}/builds/${project}/runs/${buildNumber}/deploy-caprover`,
+    `${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}/deploy-caprover`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

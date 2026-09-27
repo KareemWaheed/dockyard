@@ -78,4 +78,23 @@ describe('useRunStream', () => {
     act(() => FakeSocket.instances[0].emit({ type: 'error', message: 'Run not found' }));
     expect(result.current.lines).toContain('ERROR: Run not found');
   });
+
+  it('retries once on its own when the socket drops while the page is visible (phone resume)', () => {
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      const { result } = renderHook(() => useRunStream('build', 11, { project: 'api', active: true }), { wrapper });
+      act(() => FakeSocket.instances[0].onclose());
+      expect(result.current.status).toBe('closed');
+      act(() => vi.advanceTimersByTime(1500));
+      expect(FakeSocket.instances).toHaveLength(2);
+      // Server still unreachable: the retry drops too — stop and leave the Reconnect button.
+      act(() => FakeSocket.instances[1].onclose());
+      act(() => vi.advanceTimersByTime(5000));
+      expect(FakeSocket.instances).toHaveLength(2);
+      expect(result.current.status).toBe('closed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

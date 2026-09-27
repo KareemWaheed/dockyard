@@ -53,6 +53,7 @@ describe('LogsTab', () => {
     expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
   });
 
+  // Renders 5,000 lines in jsdom (3–5 s here) — give it more than the default 5 s so parallel runs don't flake.
   it('keeps auto-following once the 5,000-line cap is reached (M-4)', () => {
     // scrollHeight isn't laid out in jsdom — stand in a value the test controls,
     // so we can tell whether the auto-follow effect re-ran on the latest chunk.
@@ -77,5 +78,5 @@ describe('LogsTab', () => {
     expect(body.scrollTop).toBe(200);
 
     delete HTMLElement.prototype.scrollHeight;
-  });
+  }, 15000);
 });

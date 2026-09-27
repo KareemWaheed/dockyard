@@ -190,7 +190,11 @@ export default function BuildsPage() {
   const base = `/builds/${encodeURIComponent(project)}`;
   const inDetail = num != null;
   const fromNum = search.get('from');
-  const fromRun = fromNum != null ? runs.find((r) => r.type === 'build' && r.build_number === Number(fromNum)) : undefined;
+  // Same lookup as the detail view: loaded pages first, then the single-run fetch (deep links to old runs).
+  const fromRun =
+    fromNum != null
+      ? [...runs, singleQ.data].find((r) => r?.type === 'build' && r.build_number === Number(fromNum))
+      : undefined;
   // Tags already built (loaded runs) so "Rebuild with next tag" never reuses one.
   const tagParam = tagParamOf(def.params || []);
   const knownTags = tagParam

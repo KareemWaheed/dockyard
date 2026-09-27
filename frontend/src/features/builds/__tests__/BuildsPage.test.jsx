@@ -119,4 +119,10 @@ describe('BuildsPage', () => {
     await userEvent.setup().keyboard('{Escape}');
     await waitFor(() => expect(router.state.location.search).toBe(''));
   });
+
+  it('prefills "change parameters" from a deep-linked run that is not in the loaded list', async () => {
+    api.fetchBuildRun.mockResolvedValue({ id: 5, type: 'build', build_number: 5, status: 'success', branch: 'old', args_json: '[]', started_at: '2026-09-01 08:00:00' });
+    renderApp('/builds/api/5?new=1&from=5');
+    expect(await screen.findByRole('dialog', { name: /New build — API \(from #5\)/ })).toBeInTheDocument();
+  });
 });

@@ -15,6 +15,9 @@ export function useRunStream(kind, runId, { project, active = false } = {}) {
   const [stuck, setStuck] = useState(false);
   const [meta, setMeta] = useState({});
   const [attempt, setAttempt] = useState(0);
+  // One automatic retry per drop while the page is visible (phones can deliver the close
+  // after the app is already back in front, so the visibilitychange listener would miss it).
+  const autoRetried = useRef(false);
   // Read at message time so changing them doesn't reopen the socket.
   const opts = useRef({ project, active, qc });
   opts.current = { project, active, qc };
@@ -31,7 +34,9 @@ export function useRunStream(kind, runId, { project, active = false } = {}) {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${window.location.host}/ws/${kind === 'build' ? 'builds' : 'flyway'}?runId=${runId}`);
     ws.onopen = () => setStatus('open');
+    let retryTimer = null;
     ws.onmessage = (e) => {
+      autoRetried.current = false;
       const msg = JSON.parse(e.data);
       if (msg.type === 'chunk') {
         setStuck(false);
@@ -61,11 +66,17 @@ export function useRunStream(kind, runId, { project, active = false } = {}) {
       }
     };
     const onDrop = () => {
-      if (!done) setStatus('closed');
+      if (done) return;
+      setStatus('closed');
+      if (document.visibilityState === 'visible' && !autoRetried.current) {
+        autoRetried.current = true;
+        retryTimer = setTimeout(() => setAttempt((n) => n + 1), 1000);
+      }
     };
     ws.onclose = onDrop;
     ws.onerror = onDrop;
     return () => {
+      clearTimeout(retryTimer);
       ws.onmessage = null;
       ws.onclose = null;
       ws.onerror = null;
