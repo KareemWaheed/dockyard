@@ -2,7 +2,8 @@ name: Build & Push Docker Image
 
 on:
   push:
-    branches: [master, feat/secrets-encryption, feat/caprover-deploy, feat/ui-rebuild]
+    # feat/ui-rebuild publishes :latest only until it is merged (PR #2) — remove it then.
+    branches: [master, feat/ui-rebuild]
   workflow_dispatch:
 
 jobs:

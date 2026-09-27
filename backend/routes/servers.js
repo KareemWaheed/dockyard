@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { spawn } = require('child_process');
+const { composeCmd, INVALID_COMPOSE_CMD } = require('../services/validate');
 const db = require('../db');
 const { connect, exec } = require('../services/ssh');
 const { parseComposePs, parseBatchInspect } = require('../services/docker');
@@ -29,7 +30,8 @@ router.get('/:env/containers', async (req, res) => {
       passphrase: sshPassphrase || undefined,
     },
   };
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
 
   try {
     const conn = await connect(env, serverCfg);

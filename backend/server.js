@@ -3,6 +3,15 @@ const cors = require('cors');
 const http = require('http');
 const { allowedOrigins, rejectCrossSiteWrites } = require('./services/origin');
 
+// Refuse to start without a valid ENCRYPTION_KEY: secrets can't be read or written without it,
+// and a first-run config migration would otherwise fail half-way and leave an empty database.
+try {
+  require('./encryption').assertEncryptionKey();
+} catch (err) {
+  console.error(`FATAL: ${err.message}`);
+  process.exit(1);
+}
+
 // Must be first — initializes SQLite and runs migration if needed
 require('./db');
 const { hydrateQueue } = require('./services/build-manager');

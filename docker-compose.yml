@@ -5,7 +5,8 @@ services:
     privileged: true
     pid: host
     environment:
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # Required: 64 hex chars (openssl rand -hex 32). Compose refuses to start without it.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to 64 hex characters, e.g. openssl rand -hex 32}
       # Public URL(s) allowed to open WebSockets (logs/builds/flyway). Only needed
       # if a proxy rewrites the Host header so it no longer matches the browser's Origin.
       # - CORS_ORIGIN=https://dockyard.example.com

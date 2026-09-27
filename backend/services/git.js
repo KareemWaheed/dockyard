@@ -11,7 +11,10 @@ const GIT_ENV = {
 };
 
 function repoDir(projectKey) {
-  return path.join(REPOS_DIR, projectKey);
+  const dir = path.resolve(REPOS_DIR, String(projectKey));
+  // Defence in depth: a key like "../x" must never point outside the repos folder.
+  if (!dir.startsWith(path.resolve(REPOS_DIR) + path.sep)) throw new Error(`Invalid project key: ${projectKey}`);
+  return dir;
 }
 
 // Branch is passed as an argv element (not shell-interpolated), so this only

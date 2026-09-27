@@ -40,6 +40,13 @@ function getProjects() {
   return row ? JSON.parse(row.value_json) : {};
 }
 
+// Maven is run without a shell so the decrypted DB password (and other values) reach it as
+// single argv entries — no shell expansion or injection. Windows needs a shell to run mvn.cmd;
+// that is only the local dev setup (the Docker image is Linux).
+function mavenInvocation(platform) {
+  return platform === 'win32' ? { cmd: 'mvn.cmd', shell: true } : { cmd: 'mvn', shell: false };
+}
+
 function startFlywayRun(envId, dbId, project, branch, command) {
   const env = db.prepare('SELECT * FROM flyway_envs WHERE id = ?').get(envId);
   const dbCfg = db.prepare('SELECT * FROM flyway_databases WHERE id = ?').get(dbId);
@@ -95,9 +102,10 @@ function startFlywayRun(envId, dbId, project, branch, command) {
 
   activeProcesses.set(runId, null); // placeholder so finishRun sees it as active
 
-  const proc = spawn('mvn', mvnArgs, {
+  const { cmd, shell } = mavenInvocation(process.platform);
+  const proc = spawn(cmd, mvnArgs, {
     cwd: workDir,
-    shell: true,
+    shell,
     detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -141,4 +149,4 @@ function subscribeRun(runId, onChunk, onDone) {
   };
 }
 
-module.exports = { startFlywayRun, cancelRun, subscribeRun };
+module.exports = { mavenInvocation, startFlywayRun, cancelRun, subscribeRun };

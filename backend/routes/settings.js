@@ -3,6 +3,7 @@ const db = require("../db");
 const { disconnect } = require("../services/ssh");
 const { exportConfig, importConfig } = require("../services/backup");
 const { encrypt, decryptField } = require("../encryption");
+const { isValidComposeCmd, isValidProjectKey, INVALID_COMPOSE_CMD } = require('../services/validate');
 
 const SENSITIVE_FIELDS = ["ssh_password", "ssh_key_content", "ssh_passphrase"];
 
@@ -42,6 +43,9 @@ router.post("/servers", (req, res) => {
     maintenance_flag_path,
     stacks,
   } = req.body;
+  if (docker_compose_cmd != null && docker_compose_cmd !== '' && !isValidComposeCmd(docker_compose_cmd)) {
+    return res.status(400).json({ error: INVALID_COMPOSE_CMD });
+  }
   const info = db
     .prepare(
       `
@@ -88,6 +92,9 @@ router.put("/servers/:id", (req, res) => {
     maintenance_flag_path,
     stacks,
   } = req.body;
+  if (docker_compose_cmd != null && docker_compose_cmd !== '' && !isValidComposeCmd(docker_compose_cmd)) {
+    return res.status(400).json({ error: INVALID_COMPOSE_CMD });
+  }
   db.prepare(
     `
     UPDATE servers SET name=?, host=?, ssh_username=?, ssh_password=?, ssh_key_path=?,
@@ -322,6 +329,12 @@ router.get("/config/:key", (req, res) => {
 });
 
 router.put("/config/:key", (req, res) => {
+  if (req.params.key === "projects" && req.body && typeof req.body === "object") {
+    const bad = Object.keys(req.body).filter((k) => !isValidProjectKey(k));
+    if (bad.length) {
+      return res.status(400).json({ error: `Invalid project key(s): ${bad.join(", ")}. Use letters, digits, dot, dash or underscore.` });
+    }
+  }
   db.prepare(
     "INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)",
   ).run(req.params.key, JSON.stringify(req.body));

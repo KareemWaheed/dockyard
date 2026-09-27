@@ -10,6 +10,7 @@ const { notifyDeploy } = require('../services/notify');
 const path = require('path').posix;
 const { decryptField } = require('../encryption');
 const { shellQuote, isValidName } = require('../services/shell');
+const { composeCmd, INVALID_COMPOSE_CMD } = require('../services/validate');
 
 // Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
 const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
@@ -58,7 +59,8 @@ router.post('/:env/:containerName/restart', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -80,7 +82,8 @@ router.post('/:env/:containerName/stop', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -102,7 +105,8 @@ router.post('/:env/:containerName/up', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -127,7 +131,8 @@ router.post('/:env/:containerName/pull-recreate', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -152,7 +157,8 @@ router.post('/:env/:containerName/toggle-managed', async (req, res) => {
   if (!stackPath || !serviceName) return res.status(400).json({ error: 'stackPath and serviceName are required' });
 
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   const action = enabled ? 'set-managed' : 'unset-managed';
@@ -190,7 +196,8 @@ router.post('/:env/:containerName/update-tag', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -238,7 +245,8 @@ router.post('/:env/:containerName/update-env', async (req, res) => {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);
   if (!server) return res.status(404).json({ error: `Unknown environment: ${env}` });
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   const startTime = Date.now();
   const noteSnapshot = getNote(env, containerName);
   try {
@@ -283,7 +291,8 @@ router.post('/:env/:containerName/version-info', async (req, res) => {
   if (!vi?.path) return res.status(404).json({ error: 'No version info configured for this service' });
 
   const serverCfg = getServerConfig(server);
-  const dc = server.docker_compose_cmd || 'docker compose';
+  const dc = composeCmd(server);
+  if (!dc) return res.status(400).json({ error: INVALID_COMPOSE_CMD });
   try {
     const conn = await connect(env, serverCfg);
     const raw = await exec(conn, `${dc} -f ${shellQuote(stackPath)} exec -T ${shellQuote(serviceName)} cat ${shellQuote(vi.path)}`);

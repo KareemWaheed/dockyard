@@ -14,6 +14,8 @@
 
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
+// Idle polls without ever seeing the app update before a deploy is reported as unconfirmed.
+const UNOBSERVED_IDLE_POLLS = 5;
 
 function normalizeUrl(caproverUrl) {
   let url = (caproverUrl || "").trim().replace(/\/+$/, "");
@@ -105,8 +107,9 @@ async function testConnection({ caproverUrl, appName, appToken }) {
 }
 
 // Triggers the deploy and waits for CapRover to finish updating the app.
-// Resolves on success, throws on failure/timeout. onLog receives progress
-// lines. An aborted `signal` stops the watch loop (the deploy itself keeps
+// Resolves { verified: true } once the update was seen running, { verified: false } when CapRover
+// accepted the deploy but its completion couldn't be observed; throws on failure/timeout.
+// onLog receives progress lines. An aborted `signal` stops the watch loop (the deploy itself keeps
 // running server-side on CapRover — there is no API to retract it).
 async function deployImage({
   caproverUrl,
@@ -116,6 +119,7 @@ async function deployImage({
   gitHash,
   signal,
   onLog = () => {},
+  pollIntervalMs = POLL_INTERVAL_MS,
 }) {
   const baseUrl = normalizeUrl(caproverUrl);
   const definition = JSON.stringify({ schemaVersion: 2, imageName });
@@ -142,8 +146,9 @@ async function deployImage({
 
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let wasBuilding = false;
+  let idlePolls = 0;
   while (Date.now() < deadline) {
-    await sleep(POLL_INTERVAL_MS);
+    await sleep(pollIntervalMs);
     if (signal?.aborted) {
       throw Object.assign(new Error("Deploy watch cancelled"), {
         name: "AbortError",
@@ -159,7 +164,7 @@ async function deployImage({
         onLog(
           "Deploy accepted. Note: app tokens are deploy-only, so CapRover does not allow watching progress with them — check the CapRover dashboard for the final status.\n"
         );
-        return;
+        return { verified: false };
       }
       // Transient poll errors shouldn't kill an otherwise-running deploy.
       onLog(`(poll) ${err.message}\n`);
@@ -175,8 +180,18 @@ async function deployImage({
         "CapRover reports the deploy failed — check the CapRover app logs (often an image pull/auth issue)."
       );
     }
+    if (!wasBuilding) {
+      // Idle but never seen updating: the deploy may still be queued. Give it a few polls,
+      // then report it as unconfirmed rather than claiming the new image is running.
+      idlePolls += 1;
+      if (idlePolls < UNOBSERVED_IDLE_POLLS) continue;
+      onLog(
+        "Deploy accepted, but CapRover never reported the app updating, so Dockyard could not confirm the new image is running — check the CapRover dashboard.\n"
+      );
+      return { verified: false };
+    }
     onLog(`Deploy complete — '${appName}' is now running ${imageName}.\n`);
-    return;
+    return { verified: true };
   }
   throw new Error(
     `Timed out after ${

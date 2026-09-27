@@ -65,13 +65,17 @@ function extractPushedImages(log) {
   return [...new Set(legacy)];
 }
 
-function finishRun(runId, exitCode) {
+// `status` overrides the exit-code mapping, e.g. "unverified" for a CapRover deploy whose
+// completion couldn't be observed.
+function finishRun(runId, exitCode, { status: statusOverride } = {}) {
   if (!activeProcesses.has(runId) && !cancelledRuns.has(runId)) return;
   const runRow = db
     .prepare("SELECT type, project, build_number FROM build_runs WHERE id = ?")
     .get(runId);
   const status = cancelledRuns.has(runId)
     ? "cancelled"
+    : statusOverride
+    ? statusOverride
     : exitCode === 0
     ? "success"
     : "failed";
@@ -262,7 +266,7 @@ function startCapRoverDeployRun(
     signal: aborter.signal,
     onLog: (chunk) => appendLog(runId, chunk),
   })
-    .then(() => finishRun(runId, 0))
+    .then((result) => finishRun(runId, 0, result?.verified === false ? { status: "unverified" } : {}))
     .catch((err) => {
       // Cancellation already logged "[Cancelled by user]" — no ERROR line.
       if (err.name !== "AbortError") {
