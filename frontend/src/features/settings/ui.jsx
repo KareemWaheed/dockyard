@@ -115,8 +115,7 @@ export function useConfigDraft(key, { fromServer = (d) => d, toServer = (d) => d
   dirtyRef.current = dirty;
   const draftRef = useRef(draft);
   draftRef.current = draft;
-  // A save in flight will land either way, so leaving then isn't "discarding" anything.
-  useUnsavedGuard(dirty && !saving);
+  useUnsavedGuard(dirty, saving);
 
   // Take fresh server data, but never over the top of unsaved edits.
   useEffect(() => {
@@ -149,19 +148,31 @@ export function useConfigDraft(key, { fromServer = (d) => d, toServer = (d) => d
 }
 
 // Asks before leaving the page (another section or route, or closing the tab) with unsaved edits.
-export function useUnsavedGuard(dirty) {
+// Leaving while a save is in flight waits for it: success goes on without asking, and a failed
+// save still has unsaved edits, so it asks then.
+export function useUnsavedGuard(dirty, saving = false) {
   const { confirm: askConfirm } = useDialogs();
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => (dirty || saving) && currentLocation.pathname !== nextLocation.pathname);
+  const asking = useRef(false);
 
   useEffect(() => {
-    if (blocker.state !== 'blocked') return;
+    if (blocker.state !== 'blocked' || saving || asking.current) return;
+    if (!dirty) {
+      blocker.proceed();
+      return;
+    }
+    asking.current = true;
     askConfirm({
       title: 'Discard unsaved changes?',
       description: 'You have changes in this section that are not saved yet.',
       confirmLabel: 'Discard changes',
       destructive: true,
-    }).then((res) => (res.ok ? blocker.proceed() : blocker.reset()));
-  }, [blocker, askConfirm]);
+    }).then((res) => {
+      asking.current = false;
+      if (res.ok) blocker.proceed();
+      else blocker.reset();
+    });
+  }, [blocker, askConfirm, dirty, saving]);
 
   useEffect(() => {
     if (!dirty) return;

@@ -196,4 +196,35 @@ describe('review fixes', () => {
     await waitFor(() => expect(screen.getByText('Unsaved changes')).toBeInTheDocument());
     expect(region).toHaveValue('abc');
   });
+
+  it('waits for an in-flight save before leaving, and asks only if it failed', async () => {
+    api.fetchAppConfig.mockResolvedValue({ region: 'a' });
+    let fail;
+    api.updateAppConfig.mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
+    const { router } = renderApp('/settings/aws');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Region'), 'b');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('link', { name: /GitLab/ }));
+    expect(router.state.location.pathname).toBe('/settings/aws');
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).toBeNull();
+    fail(new Error('disk full'));
+    expect(await screen.findByRole('button', { name: 'Discard changes' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/settings/aws');
+  });
+
+  it('leaves without asking once an in-flight save succeeds', async () => {
+    api.fetchAppConfig.mockResolvedValue({ region: 'a' });
+    let finish;
+    api.updateAppConfig.mockImplementation(() => new Promise((r) => { finish = r; }));
+    const { router } = renderApp('/settings/aws');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Region'), 'b');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('link', { name: /GitLab/ }));
+    expect(router.state.location.pathname).toBe('/settings/aws');
+    finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/gitlab'));
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).toBeNull();
+  });
 });
