@@ -45,10 +45,16 @@ hook.listen(0, async () => {
 
       r = await fetch(url(9999), { method: 'POST' });
       assert.strictEqual(r.status, 404);
+
+      const sms = db.prepare("INSERT INTO notifications (type, label, config_json, enabled) VALUES ('sms', 'sms', '{}', 1)").run().lastInsertRowid;
+      r = await fetch(url(sms), { method: 'POST' });
+      assert.strictEqual(r.status, 422, 'an unsupported type reports a failure instead of "sent"');
       console.log('notifications-test.test.js: all passed');
     } finally {
       server.close();
       hook.close();
+      db.close();
+      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 });

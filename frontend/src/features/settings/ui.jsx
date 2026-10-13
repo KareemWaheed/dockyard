@@ -115,7 +115,8 @@ export function useConfigDraft(key, { fromServer = (d) => d, toServer = (d) => d
   dirtyRef.current = dirty;
   const draftRef = useRef(draft);
   draftRef.current = draft;
-  useUnsavedGuard(dirty);
+  // A save in flight will land either way, so leaving then isn't "discarding" anything.
+  useUnsavedGuard(dirty && !saving);
 
   // Take fresh server data, but never over the top of unsaved edits.
   useEffect(() => {
@@ -164,7 +165,10 @@ export function useUnsavedGuard(dirty) {
 
   useEffect(() => {
     if (!dirty) return;
-    const onUnload = (e) => e.preventDefault();
+    const onUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // older Chromium only prompts when this is set
+    };
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
   }, [dirty]);

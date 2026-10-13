@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,6 +187,11 @@ export default function ServersSection() {
   const openAdd = () => { setEditing('new'); setForm({ ...EMPTY_FORM, stacks: [emptyStack()] }); setError(''); };
   const openEdit = (s) => { setEditing(s); setForm(serverToForm(s)); setError(''); };
   const close = () => setEditing(null);
+
+  // Once an error shows, keep it in step with the form so a fixed field clears it.
+  useEffect(() => {
+    if (form) setError((current) => (current ? validateServer(form) : current));
+  }, [form]);
 
   const save = async () => {
     const problem = validateServer(form);

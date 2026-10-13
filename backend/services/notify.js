@@ -32,6 +32,7 @@ async function sendNotifier(row, payload) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(cfg.headers || {}) },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) throw new Error(`Webhook ${cfg.url} returned ${res.status}`);
   } else if (row.type === 'email') {
@@ -45,6 +46,8 @@ async function sendNotifier(row, payload) {
       subject: `[Namaa] ${payload.event} — ${payload.env}/${payload.container}`,
       text: JSON.stringify(payload, null, 2),
     });
+  } else {
+    throw new Error(`Unsupported notifier type "${row.type}"`);
   }
 }
 
