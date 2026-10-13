@@ -17,6 +17,9 @@ import { useDrawer } from '@/features/container/useDrawer';
 
 const PAGE = 100;
 
+// A 40px touch target that doesn't grow the 36px (or 30px compact) table row.
+const HIT_AREA = "relative after:absolute after:inset-x-0 after:top-1/2 after:h-10 after:-translate-y-1/2 after:content-['']";
+
 const duration = (ms) => (ms != null ? `${(ms / 1000).toFixed(1)}s` : '—');
 
 export function matchesHistory(row, q) {
@@ -140,13 +143,13 @@ export default function HistoryPage() {
                     <td className="px-4 py-0 whitespace-nowrap text-muted-foreground lg:pl-6" title={row.timestamp}>{formatAgo(row.timestamp, now)}</td>
                     <td className="px-2 py-0 text-xs uppercase">{row.env}</td>
                     <td className="px-2 py-0">
-                      <button type="button" className="font-medium hover:text-primary hover:underline" onClick={() => open(row)}>{row.container_name}</button>
+                      <button type="button" className={cn('font-medium hover:text-primary hover:underline', HIT_AREA)} onClick={() => open(row)}>{row.container_name}</button>
                     </td>
                     <td className="px-2 py-0">{row.action}</td>
                     <td className="px-2 py-0"><TagChange row={row} /></td>
                     <td className="px-2 py-0">
                       {expandable ? (
-                        <button type="button" aria-expanded={isOpen} aria-label={`failed — ${isOpen ? 'hide' : 'show'} error`} className="inline-flex items-center gap-1" onClick={() => toggle(row)}>
+                        <button type="button" aria-expanded={isOpen} aria-label={`failed — ${isOpen ? 'hide' : 'show'} error`} className={cn('inline-flex items-center gap-1', HIT_AREA)} onClick={() => toggle(row)}>
                           <Result row={row} />
                           <ChevronRight className={cn('size-3.5 text-bad transition-transform', isOpen && 'rotate-90')} aria-hidden="true" />
                         </button>
@@ -184,7 +187,11 @@ export default function HistoryPage() {
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input type="search" aria-label="Filter history" placeholder="Container, action or tag…" className="h-10 pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        {q.isFetching && !q.isLoading && <span className="text-xs text-muted-foreground sm:ml-auto">Refreshing…</span>}
+        {query.trim() && hasMore ? (
+          <span className="text-xs text-muted-foreground sm:ml-auto">Searching the latest {all.length} actions — load older ones to search further.</span>
+        ) : (
+          q.isFetching && !q.isLoading && <span className="text-xs text-muted-foreground sm:ml-auto">Refreshing…</span>
+        )}
       </div>
       <div className="flex-1">{body}</div>
       {!q.isLoading && !q.isError && hasMore && (

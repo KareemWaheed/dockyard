@@ -14,8 +14,21 @@ const toServer = ({ rows, ...rest }) => ({
   projects: Object.fromEntries(rows.filter((r) => r.name.trim()).map((r) => [r.name.trim(), r.repo.trim()])),
 });
 
+// Names are keys on the server, so a repeated name would silently drop a mapping.
+export function duplicateNames(rows) {
+  const seen = new Set();
+  const dups = new Set();
+  rows.forEach((r) => {
+    const name = r.name.trim();
+    if (!name) return;
+    (seen.has(name) ? dups : seen).add(name);
+  });
+  return [...dups];
+}
+
 export default function GitLabSection() {
   const { q, draft, setDraft, dirty, save, saving } = useConfigDraft('gitlab', { label: 'GitLab settings', fromServer, toServer });
+  const dups = draft ? duplicateNames(draft.rows) : [];
   const setRow = (i, k, v) => setDraft((d) => ({ ...d, rows: d.rows.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)) }));
 
   return (
@@ -51,7 +64,7 @@ export default function GitLabSection() {
           </Card>
         </div>
       )}
-      {draft && <SaveBar dirty={dirty} saving={saving} onSave={() => save()} />}
+      {draft && <SaveBar dirty={dirty} saving={saving} onSave={() => save()} error={dups.length ? `Project names must be unique: ${dups.join(', ')}` : ''} />}
     </>
   );
 }

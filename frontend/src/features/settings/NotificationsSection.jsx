@@ -162,7 +162,10 @@ export default function NotificationsSection() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Switch aria-label={`${n.label} enabled`} className="mr-2" checked={!!n.enabled} onCheckedChange={(v) => toggle(n, v)} />
+                  {/* The label gives the small switch a 40px touch target. */}
+                  <label className="flex size-10 cursor-pointer items-center justify-center">
+                    <Switch aria-label={`${n.label} enabled`} checked={!!n.enabled} onCheckedChange={(v) => toggle(n, v)} />
+                  </label>
                   <Button variant="ghost" size="icon" className="size-10" aria-label={`Send a test to ${n.label}`} onClick={() => test(n)}><Send className="size-4" /></Button>
                   <Button variant="ghost" size="icon" className="size-10" aria-label={`Edit ${n.label}`} onClick={() => openEdit(n)}><Pencil className="size-4" /></Button>
                   <Button variant="ghost" size="icon" className="size-10 text-bad hover:text-bad" aria-label={`Remove ${n.label}`} onClick={() => remove(n)}><Trash2 className="size-4" /></Button>

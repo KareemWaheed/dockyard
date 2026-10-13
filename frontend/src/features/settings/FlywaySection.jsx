@@ -15,7 +15,7 @@ const DEFAULT_LOCATIONS = 'filesystem:src/main/resources/db/migration/';
 const EMPTY_ENV = { name: '', description: '' };
 const EMPTY_DB = {
   name: '', url: '', db_user: '', db_password: '', schemas: '',
-  locations: DEFAULT_LOCATIONS, baseline_on_migrate: true, baseline_version: '1',
+  locations: DEFAULT_LOCATIONS, baseline_on_migrate: true, baseline_version: '2', // the backend's default
 };
 
 export default function FlywaySection() {
@@ -34,7 +34,7 @@ export default function FlywaySection() {
     const { kind, id, envId, form } = editing;
     if (kind === 'env' && !form.name.trim()) return setError('Name is required.');
     if (kind === 'db') {
-      if (!form.name || !form.url || !form.db_user || !form.schemas) return setError('Name, JDBC URL, username and schemas are required.');
+      if ([form.name, form.url, form.db_user, form.schemas].some((v) => !v?.trim())) return setError('Name, JDBC URL, username and schemas are required.');
       if (!id && !form.db_password) return setError('Password is required for a new database.');
     }
     setError('');
@@ -78,7 +78,7 @@ export default function FlywaySection() {
       kind: 'db', id: d.id, envId,
       form: {
         name: d.name, url: d.url, db_user: d.db_user, db_password: '', schemas: d.schemas,
-        locations: d.locations || DEFAULT_LOCATIONS, baseline_on_migrate: !!d.baseline_on_migrate, baseline_version: d.baseline_version ?? '1',
+        locations: d.locations || DEFAULT_LOCATIONS, baseline_on_migrate: !!d.baseline_on_migrate, baseline_version: d.baseline_version ?? '2',
       },
     });
 

@@ -64,7 +64,8 @@ export default function CapRoverSection() {
 
   const save = async () => {
     if (!form.project || !form.env_key || !form.caprover_url || !form.app_name) return setError('Project, environment, CapRover URL and app name are required.');
-    if (isNew && !form.app_token) return setError('App token is required for a new target.');
+    // App tokens are scoped to one app, so a renamed app needs its own token.
+    if ((isNew || form.app_name !== editing.app_name) && !form.app_token) return setError('App token is required for a new target or a changed app name.');
     setError('');
     setBusy('save');
     const r = await runCommand({
@@ -155,7 +156,7 @@ export default function CapRoverSection() {
             <Field label="App name" htmlFor="cr-app">
               <Input id="cr-app" className="h-10 font-mono" placeholder="my-frontend" value={form.app_name} onChange={set('app_name')} />
             </Field>
-            <Field label="App token" htmlFor="cr-token" hint={isNew ? undefined : 'Leave blank to keep the current token.'}>
+            <Field label="App token" htmlFor="cr-token" hint={isNew ? undefined : 'Leave blank to keep the current token. Required if you change the app name.'}>
               <Input id="cr-token" type="password" className="h-10 font-mono" autoComplete="new-password" value={form.app_token} onChange={set('app_token')} />
             </Field>
             {testResult && (

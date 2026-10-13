@@ -21,7 +21,7 @@ export const parseList = (text) => text.split(',').map((s) => s.trim()).filter(B
 export function projectKey(name, existing) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'project';
   let key = slug;
-  for (let i = 1; existing[key]; i++) key = `${slug}_${i}`;
+  for (let i = 1; Object.hasOwn(existing, key); i++) key = `${slug}_${i}`;
   return key;
 }
 

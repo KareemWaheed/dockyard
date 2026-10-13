@@ -7,6 +7,8 @@ import { setViewport } from '@/test/viewport';
 import { formToBody, serverToForm } from '@/features/settings/ServersSection';
 import { parseList, projectKey } from '@/features/settings/BuildProjectsSection';
 import { describeTest } from '@/features/settings/CapRoverSection';
+import { duplicateNames } from '@/features/settings/GitLabSection';
+import { validateServer } from '@/features/settings/ServersSection';
 
 vi.mock('@/lib/api');
 
@@ -46,7 +48,9 @@ describe('Settings', () => {
     renderApp('/settings/servers');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Remove stage' }));
-    await user.click(await screen.findByRole('button', { name: 'Remove server' }));
+    const confirmBtn = await screen.findByRole('button', { name: 'Remove server' });
+    expect(api.deleteSettingsServer).not.toHaveBeenCalled();
+    await user.click(confirmBtn);
     await waitFor(() => expect(api.deleteSettingsServer).toHaveBeenCalledWith(3));
   });
 
@@ -102,7 +106,9 @@ describe('Settings', () => {
     const user = userEvent.setup();
     const file = new File([JSON.stringify({ servers: [] })], 'backup.json', { type: 'application/json' });
     await user.upload(await screen.findByTestId('import-file'), file);
-    await user.click(await screen.findByRole('button', { name: 'Replace settings' }));
+    const confirmBtn = await screen.findByRole('button', { name: 'Replace settings' });
+    expect(api.importSettings).not.toHaveBeenCalled();
+    await user.click(confirmBtn);
     await waitFor(() => expect(api.importSettings).toHaveBeenCalledWith({ servers: [] }));
   });
 });
@@ -138,5 +144,56 @@ describe('Settings — PROD server removal', () => {
     await user.type(screen.getByLabelText(/to confirm/), 'prod');
     await user.click(confirmBtn);
     await waitFor(() => expect(api.deleteSettingsServer).toHaveBeenCalledWith(9));
+  });
+});
+
+describe('review fixes', () => {
+  it('flags duplicate GitLab project names', () => {
+    expect(duplicateNames([{ name: 'api' }, { name: ' api ' }, { name: 'web' }, { name: '' }, { name: '' }])).toEqual(['api']);
+  });
+
+  it('requires the credential for the chosen SSH auth method', () => {
+    const base = { env_key: 'dev', host: 'h', ssh_username: 'u', ssh_password: '', ssh_key_path: '', ssh_key_content: '' };
+    expect(validateServer({ ...base, auth_method: 'password' })).toMatch(/password/);
+    expect(validateServer({ ...base, auth_method: 'path', ssh_key_path: '/k' })).toBe('');
+    expect(validateServer({ ...base, auth_method: 'paste', ssh_key_content: '  ' })).toMatch(/private key/);
+  });
+
+  it('makes project keys from own properties only', () => {
+    expect(projectKey('Constructor', {})).toBe('constructor');
+  });
+
+  it('treats a never-saved config key as empty instead of failing', async () => {
+    api.fetchAppConfig.mockResolvedValue(null);
+    renderApp('/settings/gitlab');
+    expect(await screen.findByLabelText('Base URL')).toHaveValue('');
+  });
+
+  it('asks before leaving a section with unsaved changes', async () => {
+    api.fetchAppConfig.mockResolvedValue({ region: 'eu-central-1' });
+    const { router } = renderApp('/settings/aws');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Region'), 'x');
+    await user.click(screen.getByRole('link', { name: /GitLab/ }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(router.state.location.pathname).toBe('/settings/aws');
+    await user.click(screen.getByRole('link', { name: /GitLab/ }));
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/gitlab'));
+  });
+
+  it('keeps edits typed while a save is in flight', async () => {
+    api.fetchAppConfig.mockResolvedValue({ region: 'a' });
+    let finish;
+    api.updateAppConfig.mockImplementation(() => new Promise((r) => { finish = r; }));
+    renderApp('/settings/aws');
+    const user = userEvent.setup();
+    const region = await screen.findByLabelText('Region');
+    await user.type(region, 'b');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.type(region, 'c');
+    finish({ ok: true });
+    await waitFor(() => expect(screen.getByText('Unsaved changes')).toBeInTheDocument());
+    expect(region).toHaveValue('abc');
   });
 });

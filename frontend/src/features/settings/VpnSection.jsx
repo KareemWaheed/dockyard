@@ -62,7 +62,7 @@ export default function VpnSection() {
           <Button variant="outline" className="h-10 text-warn hover:text-warn" disabled={!!busy} onClick={() => run('restart')}><RotateCw className="size-4" /> {busy === 'restart' ? LABELS.restart : 'Restart'}</Button>
         </div>
         {(output || exitCode != null) && (
-          <pre aria-label="VPN output" className="max-h-[40vh] overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+          <pre role="log" aria-live="polite" aria-label="VPN output" className="max-h-[40vh] overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
             {output}
             {exitCode != null && (
               <span className={exitCode === 0 ? 'text-ok' : 'text-bad'}>{`\n${exitCode === 0 ? '✓ Done' : `✗ Exited with code ${exitCode}`}`}</span>

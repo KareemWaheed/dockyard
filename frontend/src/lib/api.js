@@ -390,8 +390,10 @@ export async function deployRunToCapRover(
   return r.json();
 }
 
+// A key that was never saved (fresh install) comes back as null, not an error.
 export async function fetchAppConfig(key) {
   const r = await apiFetch(`${BASE}/settings/config/${key}`);
+  if (r.status === 404) return null;
   if (!r.ok) throw await readError(r);
   return r.json();
 }

@@ -39,6 +39,20 @@ export function serverToForm(s) {
   };
 }
 
+const CREDENTIAL = {
+  password: ['ssh_password', 'An SSH password is required.'],
+  path: ['ssh_key_path', 'A key file path is required.'],
+  paste: ['ssh_key_content', 'A private key is required.'],
+};
+
+// Returns an error message, or '' when the form can be saved.
+export function validateServer(form) {
+  if (!form.env_key.trim() || !form.host.trim() || !form.ssh_username.trim()) return 'Environment key, host and SSH username are required.';
+  const [field, message] = CREDENTIAL[form.auth_method];
+  if (!form[field]?.trim()) return message;
+  return '';
+}
+
 export function formToBody(form) {
   return {
     env_key: form.env_key.trim(), name: form.name, host: form.host, ssh_username: form.ssh_username,
@@ -168,12 +182,16 @@ export default function ServersSection() {
   const [editing, setEditing] = useState(null); // null | 'new' | server
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const openAdd = () => { setEditing('new'); setForm({ ...EMPTY_FORM, stacks: [emptyStack()] }); };
-  const openEdit = (s) => { setEditing(s); setForm(serverToForm(s)); };
+  const openAdd = () => { setEditing('new'); setForm({ ...EMPTY_FORM, stacks: [emptyStack()] }); setError(''); };
+  const openEdit = (s) => { setEditing(s); setForm(serverToForm(s)); setError(''); };
   const close = () => setEditing(null);
 
   const save = async () => {
+    const problem = validateServer(form);
+    setError(problem);
+    if (problem) return;
     const body = formToBody(form);
     const isNew = editing === 'new';
     setSaving(true);
@@ -253,6 +271,7 @@ export default function ServersSection() {
         title={editing === 'new' ? 'Add server' : `Edit ${editing?.env_key ?? ''}`}
         onSubmit={save}
         saving={saving}
+        error={error}
       >
         {form && <ServerForm form={form} setForm={setForm} editing={editing !== 'new'} />}
       </FormSheet>
