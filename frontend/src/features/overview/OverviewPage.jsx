@@ -56,7 +56,7 @@ export default function OverviewPage() {
           <div className="mx-auto max-w-md rounded-xl border bg-card p-6 text-center">
             <p className="mb-1 text-[15px] font-semibold">No servers yet</p>
             <p className="mb-4 text-muted-foreground">Dockyard connects to your servers over SSH and reads their compose files.</p>
-            <Button asChild><Link to="/settings">Add your first server</Link></Button>
+            <Button asChild><Link to="/settings/servers">Add your first server</Link></Button>
           </div>
         </div>
       </>

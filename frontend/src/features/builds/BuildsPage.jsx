@@ -47,7 +47,7 @@ function Empty({ title, children }) {
 function NoProjects() {
   return (
     <Empty title="No build projects yet">
-      Add one in <Link className="text-primary underline" to="/settings">Settings</Link> → Build Projects.
+      Add one in <Link className="text-primary underline" to="/settings/build-projects">Settings</Link> → Build projects.
     </Empty>
   );
 }

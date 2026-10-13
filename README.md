@@ -200,10 +200,9 @@ dockyard/
 ├── frontend/
 │   └── src/
 │       ├── app/            # App shell, router, sidebar, theme, dialogs, PWA
-│       ├── features/       # overview, env, container drawer, builds, migrations, runs, palette
+│       ├── features/       # overview, env, container drawer, builds, migrations, runs, history, settings, palette
 │       ├── components/     # shared UI (shadcn/ui) and the Dockyard logo
-│       ├── lib/            # API client, React Query keys, helpers
-│       └── legacy/         # History and Settings views (redesign pending)
+│       └── lib/            # API client, React Query keys, helpers
 ├── scripts/                # Build scripts (user-provided, *-build.sh gitignored)
 ├── secret-keys/            # SSH keys (gitignored)
 ├── config.example.json     # Optional seed config

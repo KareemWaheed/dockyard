@@ -4,9 +4,8 @@ import OverviewPage from '@/features/overview/OverviewPage';
 import EnvPage from '@/features/env/EnvPage';
 import BuildsPage, { BuildsIndex } from '@/features/builds/BuildsPage';
 import MigrationsPage from '@/features/migrations/MigrationsPage';
-import LegacyScope from '@/legacy/LegacyScope';
-import HistoryView from '@/legacy/HistoryView';
-import SettingsView from '@/legacy/SettingsView';
+import HistoryPage from '@/features/history/HistoryPage';
+import SettingsPage from '@/features/settings/SettingsPage';
 
 function NotFound() {
   return (
@@ -16,12 +15,6 @@ function NotFound() {
     </div>
   );
 }
-
-const legacy = (View) => (
-  <LegacyScope>
-    <View />
-  </LegacyScope>
-);
 
 export const routes = [
   {
@@ -35,8 +28,9 @@ export const routes = [
       { path: 'builds/:project/:num', element: <BuildsPage /> },
       { path: 'migrations', element: <MigrationsPage /> },
       { path: 'migrations/:runId', element: <MigrationsPage /> },
-      { path: 'history', element: legacy(HistoryView) },
-      { path: 'settings', element: legacy(SettingsView) },
+      { path: 'history', element: <HistoryPage /> },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/:section', element: <SettingsPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

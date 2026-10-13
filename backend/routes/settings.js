@@ -189,21 +189,15 @@ router.delete("/notifications/:id", (req, res) => {
 });
 
 router.post("/notifications/:id/test", async (req, res) => {
-  const { notifyDeploy } = require("../services/notify");
+  const { sendTestNotification } = require("../services/notify");
+  const row = db.prepare("SELECT * FROM notifications WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Notifier not found" });
   try {
-    await notifyDeploy({
-      env: "test",
-      container: "test-container",
-      action: "restart",
-      fromTag: null,
-      toTag: null,
-      durationMs: 0,
-      success: true,
-      error: null,
-    });
+    await sendTestNotification(row);
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // 422, not 5xx: proxies like Cloudflare replace 5xx bodies with their own page.
+    res.status(422).json({ error: err.message });
   }
 });
 

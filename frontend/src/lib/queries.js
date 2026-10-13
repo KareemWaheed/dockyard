@@ -2,6 +2,9 @@ import { keepPreviousData, useMutation, useMutationState, useQueries, useQuery, 
 import { containerAction, fetchContainers, fetchSettingsServers } from '@/lib/api';
 
 export const ENV_POLL_MS = 30000;
+
+// Retry a failed query once — unless the SSO session expired, which a retry can't fix.
+export const retryOnce = (failures, err) => !err?.sessionExpired && failures < 1;
 export const ACTION_KEY = 'container-action';
 
 export const qk = {
@@ -38,7 +41,7 @@ export function envQueryOptions(env) {
     enabled: !!env,
     refetchInterval: ENV_POLL_MS,
     refetchIntervalInBackground: false,
-    retry: 1,
+    retry: retryOnce,
     placeholderData: keepPreviousData,
   };
 }

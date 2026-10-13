@@ -73,6 +73,6 @@ describe('Overview', () => {
   it('shows the setup card when no servers are configured', async () => {
     api.fetchSettingsServers.mockResolvedValue([]);
     renderApp('/');
-    expect(await screen.findByRole('link', { name: 'Add your first server' })).toHaveAttribute('href', '/settings');
+    expect(await screen.findByRole('link', { name: 'Add your first server' })).toHaveAttribute('href', '/settings/servers');
   });
 });

@@ -8,11 +8,11 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const walk = (dir) =>
   readdirSync(dir).flatMap((f) => {
     const p = path.join(dir, f);
-    if (statSync(p).isDirectory()) return f === 'legacy' || f === '__tests__' ? [] : walk(p);
+    if (statSync(p).isDirectory()) return f === '__tests__' ? [] : walk(p);
     return /\.(jsx?|mjs)$/.test(f) ? [p] : [];
   });
 
-describe('no browser dialogs outside legacy (spec §6.1)', () => {
+describe('no browser dialogs (spec §6.1)', () => {
   it('has no alert/confirm/prompt calls', () => {
     const offenders = walk(SRC).filter((f) => /(?<![\w.])(window\.)?(alert|confirm|prompt)\(/.test(readFileSync(f, 'utf8')));
     expect(offenders.map((f) => path.relative(SRC, f))).toEqual([]);

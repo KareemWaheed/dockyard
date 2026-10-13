@@ -56,8 +56,8 @@ export default function MigrationsPage() {
         <PageHeader title="Migrations" />
         <Empty title="Set up migrations">
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-left">
-            <li>In <Link className="text-primary underline" to="/settings">Settings</Link> → Build Projects, turn on “Flyway project” for a project.</li>
-            <li>In <Link className="text-primary underline" to="/settings">Settings</Link> → Flyway, add an environment and its databases.</li>
+            <li>In <Link className="text-primary underline" to="/settings/build-projects">Settings</Link> → Build projects, turn on “Flyway project” for a project.</li>
+            <li>In <Link className="text-primary underline" to="/settings/flyway">Settings</Link> → Flyway, add an environment and its databases.</li>
           </ol>
         </Empty>
       </div>

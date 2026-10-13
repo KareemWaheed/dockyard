@@ -12,6 +12,7 @@ import { useTheme } from '@/app/ThemeProvider';
 import { useLayout } from '@/app/layoutContext';
 import { useDrawer } from '@/features/container/useDrawer';
 import { useFocusedCell } from '@/features/overview/focusStore';
+import { SECTIONS as SETTINGS_SECTIONS } from '@/features/settings/SettingsPage';
 
 const PAGES = [
   ['Overview', '/'],
@@ -69,6 +70,11 @@ export function CommandPalette({ open, onOpenChange }) {
         <CommandGroup heading="Pages">
           {PAGES.map(([label, path]) => (
             <CommandItem key={path} value={`page ${label}`} onSelect={go(() => navigate(path))}>{label}</CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Settings">
+          {SETTINGS_SECTIONS.map(({ id, label }) => (
+            <CommandItem key={`settings-${id}`} value={`settings ${label}`} onSelect={go(() => navigate(`/settings/${id}`))}>Settings: {label}</CommandItem>
           ))}
         </CommandGroup>
         {projectEntries.length > 0 && (

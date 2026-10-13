@@ -24,9 +24,10 @@ describe('app shell', () => {
     expect(dev.compareDocumentPosition(prod) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('renders a legacy view inside the legacy scope', async () => {
-    const { container } = renderApp('/history');
-    expect(await screen.findByText('Deployment History')).toBeInTheDocument();
-    expect(container.querySelector('.legacy-scope')).not.toBeNull();
+  it('sends /settings to its first section', async () => {
+    api.fetchSettingsServers.mockResolvedValue([]);
+    const { router } = renderApp('/settings');
+    expect(await screen.findByRole('heading', { name: 'Servers' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/settings/servers');
   });
 });
