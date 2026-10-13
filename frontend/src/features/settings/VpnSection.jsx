@@ -52,7 +52,7 @@ export default function VpnSection() {
       <Card className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge tone={tone}>{q.isLoading ? 'checking…' : status || 'unknown'}</StatusBadge>
-          <Button variant="ghost" size="sm" disabled={!!busy || q.isFetching} onClick={() => q.refetch()}>
+          <Button variant="ghost" className="h-10" disabled={!!busy || q.isFetching} onClick={() => q.refetch()}>
             <RefreshCw className="size-3.5" /> Refresh
           </Button>
         </div>

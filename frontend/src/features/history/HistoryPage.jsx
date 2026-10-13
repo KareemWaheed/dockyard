@@ -11,6 +11,7 @@ import { fetchHistory } from '@/lib/api';
 import { formatAgo } from '@/lib/containers';
 import { qk, useEnvKeys } from '@/lib/queries';
 import { useNow } from '@/lib/useNow';
+import { useTheme } from '@/app/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { useDrawer } from '@/features/container/useDrawer';
 
@@ -43,6 +44,8 @@ export default function HistoryPage() {
   const envKeys = useEnvKeys();
   const now = useNow(30000);
   const { openDrawer } = useDrawer();
+  const { density } = useTheme();
+  const rowHeight = density === 'compact' ? 'h-[30px]' : 'h-9';
   const [env, setEnv] = useState('');
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(PAGE);
@@ -87,9 +90,9 @@ export default function HistoryPage() {
           {rows.map((row) => {
             const isOpen = expanded === row.id;
             return (
-              <li key={row.id} className="space-y-1.5 px-4 py-3 text-sm">
+              <li key={row.id} className="space-y-1 px-4 py-2 text-[13px]">
                 <div className="flex items-center gap-2">
-                  <button type="button" className="min-w-0 truncate font-medium text-primary" onClick={() => open(row)}>
+                  <button type="button" className="h-10 min-w-0 truncate font-medium text-primary" onClick={() => open(row)}>
                     {row.container_name}
                   </button>
                   <span className="text-xs text-muted-foreground uppercase">{row.env}</span>
@@ -103,7 +106,7 @@ export default function HistoryPage() {
                 </div>
                 {!row.success && row.error_message && (
                   <>
-                    <button type="button" aria-expanded={isOpen} className="inline-flex h-8 items-center gap-1 text-xs text-bad" onClick={() => toggle(row)}>
+                    <button type="button" aria-expanded={isOpen} className="inline-flex h-10 items-center gap-1 text-xs text-bad" onClick={() => toggle(row)}>
                       <ChevronRight className={cn('size-3.5 transition-transform', isOpen && 'rotate-90')} aria-hidden="true" /> Error details
                     </button>
                     {isOpen && <pre className="overflow-auto rounded-md bg-bad-bg p-2 font-mono text-xs whitespace-pre-wrap text-bad">{row.error_message}</pre>}
@@ -115,7 +118,7 @@ export default function HistoryPage() {
         </ul>
 
         {/* Tablets and up: a table */}
-        <table className="hidden w-full text-sm md:table">
+        <table className="hidden w-full text-[13px] md:table">
           <thead className="sticky top-0 z-[1] bg-card text-left text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="w-24 px-4 py-2 font-medium lg:pl-6">Time</th>
@@ -133,15 +136,15 @@ export default function HistoryPage() {
               const expandable = !row.success && !!row.error_message;
               return (
                 <Fragment key={row.id}>
-                  <tr className={cn('border-b', !row.success && 'bg-bad-bg/40')}>
-                    <td className="px-4 py-2 whitespace-nowrap text-muted-foreground lg:pl-6" title={row.timestamp}>{formatAgo(row.timestamp, now)}</td>
-                    <td className="px-2 py-2 text-xs uppercase">{row.env}</td>
-                    <td className="px-2 py-2">
+                  <tr className={cn('border-b', rowHeight, !row.success && 'bg-bad-bg/40')}>
+                    <td className="px-4 py-0 whitespace-nowrap text-muted-foreground lg:pl-6" title={row.timestamp}>{formatAgo(row.timestamp, now)}</td>
+                    <td className="px-2 py-0 text-xs uppercase">{row.env}</td>
+                    <td className="px-2 py-0">
                       <button type="button" className="font-medium hover:text-primary hover:underline" onClick={() => open(row)}>{row.container_name}</button>
                     </td>
-                    <td className="px-2 py-2">{row.action}</td>
-                    <td className="px-2 py-2"><TagChange row={row} /></td>
-                    <td className="px-2 py-2">
+                    <td className="px-2 py-0">{row.action}</td>
+                    <td className="px-2 py-0"><TagChange row={row} /></td>
+                    <td className="px-2 py-0">
                       {expandable ? (
                         <button type="button" aria-expanded={isOpen} aria-label={`failed — ${isOpen ? 'hide' : 'show'} error`} className="inline-flex items-center gap-1" onClick={() => toggle(row)}>
                           <Result row={row} />
@@ -151,7 +154,7 @@ export default function HistoryPage() {
                         <Result row={row} />
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground lg:pr-6">{duration(row.duration_ms)}</td>
+                    <td className="px-4 py-0 text-right tabular-nums text-muted-foreground lg:pr-6">{duration(row.duration_ms)}</td>
                   </tr>
                   {expandable && isOpen && (
                     <tr className="border-b">

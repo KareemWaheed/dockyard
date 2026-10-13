@@ -43,9 +43,9 @@ function ParamCard({ p, i, count, update, move, remove }) {
         <span className="text-xs font-medium text-muted-foreground">#{i + 1}</span>
         <span className="truncate text-sm font-medium">{p.label || p.name || 'New parameter'}</span>
         <div className="ml-auto flex gap-1">
-          <Button variant="ghost" size="icon" className="size-9" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp className="size-4" /></Button>
-          <Button variant="ghost" size="icon" className="size-9" aria-label="Move down" disabled={i === count - 1} onClick={() => move(i, 1)}><ArrowDown className="size-4" /></Button>
-          <Button variant="ghost" size="icon" className="size-9 text-bad hover:text-bad" aria-label={`Remove ${p.label || p.name || 'parameter'}`} onClick={() => remove(i)}><Trash2 className="size-4" /></Button>
+          <Button variant="ghost" size="icon" className="size-10" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp className="size-4" /></Button>
+          <Button variant="ghost" size="icon" className="size-10" aria-label="Move down" disabled={i === count - 1} onClick={() => move(i, 1)}><ArrowDown className="size-4" /></Button>
+          <Button variant="ghost" size="icon" className="size-10 text-bad hover:text-bad" aria-label={`Remove ${p.label || p.name || 'parameter'}`} onClick={() => remove(i)}><Trash2 className="size-4" /></Button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -99,7 +99,7 @@ function RemoteStatus({ projectKey: key, repo, saved }) {
       {info.isCloned ? <code className="break-all">{info.diskRemoteUrl || '(none)'}</code> : <span className="text-muted-foreground">not cloned yet</span>}
       {differs && <span className="inline-flex items-center gap-1 text-warn"><AlertTriangle className="size-3.5" aria-hidden="true" /> differs from the saved URL</span>}
       {info.isCloned && (
-        <Button variant="outline" size="sm" className="ml-auto" disabled={!repo} onClick={sync}>
+        <Button variant="outline" className="ml-auto h-10" disabled={!repo} onClick={sync}>
           <RefreshCw className="size-3.5" /> Sync URL to server repo
         </Button>
       )}
@@ -163,13 +163,13 @@ export default function BuildProjectsSection() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Projects">
             {keys.map((k) => (
-              <Button key={k} variant={k === active ? 'default' : 'outline'} size="sm" className="h-9" aria-pressed={k === active} onClick={() => setActive(k)}>
+              <Button key={k} variant={k === active ? 'default' : 'outline'} className="h-10" aria-pressed={k === active} onClick={() => setActive(k)}>
                 {draft[k].name || k}
               </Button>
             ))}
             <form onSubmit={addProject} className="flex gap-1">
-              <Input aria-label="New project name" className="h-9 w-44" placeholder="New project name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <Button type="submit" variant="outline" size="icon" className="size-9" aria-label="Add project" disabled={!newName.trim()}><Plus className="size-4" /></Button>
+              <Input aria-label="New project name" className="h-10 w-44" placeholder="New project name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <Button type="submit" variant="outline" size="icon" className="size-10" aria-label="Add project" disabled={!newName.trim()}><Plus className="size-4" /></Button>
             </form>
           </div>
 

@@ -125,3 +125,18 @@ describe('settings helpers', () => {
     expect(describeTest({ warning: 'token not verified' })).toBe('token not verified');
   });
 });
+
+describe('Settings — PROD server removal', () => {
+  it('requires typing the env key (spec §6.1)', async () => {
+    api.fetchSettingsServers.mockResolvedValue([{ ...server, id: 9, env_key: 'prod' }]);
+    api.deleteSettingsServer.mockResolvedValue({ ok: true });
+    renderApp('/settings/servers');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Remove prod' }));
+    const confirmBtn = await screen.findByRole('button', { name: 'Remove server' });
+    expect(confirmBtn).toBeDisabled();
+    await user.type(screen.getByLabelText(/to confirm/), 'prod');
+    await user.click(confirmBtn);
+    await waitFor(() => expect(api.deleteSettingsServer).toHaveBeenCalledWith(9));
+  });
+});

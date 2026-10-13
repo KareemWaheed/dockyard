@@ -114,8 +114,8 @@ export default function FlywaySection() {
                         <p className="text-sm font-medium">{d.name}</p>
                         <p className="truncate font-mono text-xs text-muted-foreground">{d.url} · {d.schemas}</p>
                       </div>
-                      <Button variant="ghost" size="icon" className="size-9" aria-label={`Edit ${d.name}`} onClick={() => editDb(d, env.id)}><Pencil className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" className="size-9 text-bad hover:text-bad" aria-label={`Remove ${d.name}`} onClick={() => removeDb(d)}><Trash2 className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="size-10" aria-label={`Edit ${d.name}`} onClick={() => editDb(d, env.id)}><Pencil className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="size-10 text-bad hover:text-bad" aria-label={`Remove ${d.name}`} onClick={() => removeDb(d)}><Trash2 className="size-4" /></Button>
                     </li>
                   ))}
                   <li>

@@ -27,7 +27,7 @@ export const SECTIONS = [
 const linkClass = ({ isActive }) =>
   cn(
     'flex shrink-0 items-center gap-2 rounded-md px-3 text-[13px] whitespace-nowrap',
-    'h-9 lg:h-8 lg:px-2',
+    'h-10 lg:px-2',
     isActive ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
   );
 

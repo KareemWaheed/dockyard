@@ -7,6 +7,7 @@ import { Tag } from '@/components/status';
 import { createSettingsServer, deleteSettingsServer, updateSettingsServer } from '@/lib/api';
 import { qk, useServers } from '@/lib/queries';
 import { useRunCommand } from '@/features/runs/useRunCommand';
+import { isProd } from '@/features/container/actions';
 import { Card, EmptyNote, Field, FormSheet, LoadError, LoadingList, SectionHeader, textareaClass } from '@/features/settings/ui';
 
 const emptyStack = () => ({ name: '', path: '', versionInfo: [] });
@@ -115,7 +116,7 @@ function ServerForm({ form, setForm, editing }) {
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Compose stacks</h3>
-          <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, stacks: [...f.stacks, emptyStack()] }))}>
+          <Button type="button" variant="outline" className="h-10" onClick={() => setForm((f) => ({ ...f, stacks: [...f.stacks, emptyStack()] }))}>
             <Plus className="size-4" /> Add stack
           </Button>
         </div>
@@ -136,19 +137,19 @@ function ServerForm({ form, setForm, editing }) {
             <div className="space-y-2 rounded-md bg-muted/50 p-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">Version info (optional) — where each service keeps its build metadata</span>
-                <Button type="button" variant="ghost" size="xs" onClick={() => setStack(i, { versionInfo: [...(st.versionInfo || []), { serviceName: '', path: '', format: 'properties' }] })}>
-                  <Plus /> Add
+                <Button type="button" variant="ghost" className="h-10" onClick={() => setStack(i, { versionInfo: [...(st.versionInfo || []), { serviceName: '', path: '', format: 'properties' }] })}>
+                  <Plus className="size-4" /> Add
                 </Button>
               </div>
               {(st.versionInfo || []).map((vi, j) => (
                 <div key={j} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-                  <Input aria-label="Service name" className="h-9 sm:w-36" placeholder="backend" value={vi.serviceName} onChange={(e) => setVi(i, j, 'serviceName', e.target.value)} />
-                  <Input aria-label="Path in container" className="h-9 flex-1 font-mono" placeholder="/app/git.properties" value={vi.path} onChange={(e) => setVi(i, j, 'path', e.target.value)} />
-                  <NativeSelect aria-label="Format" className="w-32 [&_select]:h-9" value={vi.format} onChange={(e) => setVi(i, j, 'format', e.target.value)}>
+                  <Input aria-label="Service name" className="h-10 sm:w-36" placeholder="backend" value={vi.serviceName} onChange={(e) => setVi(i, j, 'serviceName', e.target.value)} />
+                  <Input aria-label="Path in container" className="h-10 flex-1 font-mono" placeholder="/app/git.properties" value={vi.path} onChange={(e) => setVi(i, j, 'path', e.target.value)} />
+                  <NativeSelect aria-label="Format" className="w-32" value={vi.format} onChange={(e) => setVi(i, j, 'format', e.target.value)}>
                     <option value="properties">properties</option>
                     <option value="json">json</option>
                   </NativeSelect>
-                  <Button type="button" variant="ghost" size="icon" className="size-9" aria-label="Remove version info" onClick={() => setStack(i, { versionInfo: st.versionInfo.filter((_, idx) => idx !== j) })}>
+                  <Button type="button" variant="ghost" size="icon" className="size-10" aria-label="Remove version info" onClick={() => setStack(i, { versionInfo: st.versionInfo.filter((_, idx) => idx !== j) })}>
                     <X className="size-4" />
                   </Button>
                 </div>
@@ -194,6 +195,9 @@ export default function ServersSection() {
         description: `Dockyard stops managing ${s.name || s.env_key} (${s.host}). Nothing on the server itself is changed.`,
         confirmLabel: 'Remove server',
         destructive: true,
+        // Same rule as container actions (spec §6.1): PROD needs the env key typed.
+        level: isProd(s.env_key) ? 'typed' : 'confirm',
+        typedValue: s.env_key,
       },
       pending: `Removing ${s.env_key}…`,
       success: `${s.env_key} removed`,
