@@ -1,4 +1,26 @@
+import { isAuthRedirect, markSessionExpired } from "@/lib/session";
+
 const BASE = "/api";
+
+export class SessionExpiredError extends Error {
+  constructor() {
+    super("Your sign-in has expired — sign in again to continue.");
+    this.name = "SessionExpiredError";
+    this.sessionExpired = true;
+  }
+}
+
+// Every API call goes through here. Redirects are not followed: a redirect on /api can only
+// be the SSO proxy (Cloudflare Access) sending us to its login page, which fetch can't follow
+// cross-origin anyway — it would surface as an opaque "Failed to fetch".
+async function apiFetch(url, init) {
+  const r = await fetch(url, { ...init, redirect: "manual" });
+  if (isAuthRedirect(r)) {
+    markSessionExpired();
+    throw new SessionExpiredError();
+  }
+  return r;
+}
 
 // Builds a readable Error from a failed response. JSON {error} bodies pass
 // through; HTML bodies (proxy/Cloudflare error pages, Express default 404s)
@@ -18,13 +40,13 @@ async function readError(r) {
 }
 
 export async function fetchContainers(env) {
-  const r = await fetch(`${BASE}/servers/${encodeURIComponent(env)}/containers`);
+  const r = await apiFetch(`${BASE}/servers/${encodeURIComponent(env)}/containers`);
   if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function containerAction(env, containerName, action, body) {
-  const r = await fetch(
+  const r = await apiFetch(
     `${BASE}/containers/${encodeURIComponent(env)}/${encodeURIComponent(containerName)}/${action}`,
     {
       method: "POST",
@@ -37,25 +59,25 @@ export async function containerAction(env, containerName, action, body) {
 }
 
 export async function fetchBranches(project) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/branches`);
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/branches`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function fetchProjects() {
-  const r = await fetch(`${BASE}/builds/projects`);
+  const r = await apiFetch(`${BASE}/builds/projects`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function fetchProjectRemote(project) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`);
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function updateProjectRemote(project, repoUrl) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`, {
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repoUrl }),
@@ -69,7 +91,7 @@ export async function saveNote(env, containerName, note) {
 }
 
 export async function addService(env, stackIdx, body) {
-  const r = await fetch(`${BASE}/services/${encodeURIComponent(env)}/${stackIdx}`, {
+  const r = await apiFetch(`${BASE}/services/${encodeURIComponent(env)}/${stackIdx}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -80,14 +102,14 @@ export async function addService(env, stackIdx, body) {
 
 // Starts a clone — returns { runId, buildNumber } or { alreadyCloned: true }
 export async function cloneRepo(project) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/clone`, { method: "POST" });
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/clone`, { method: "POST" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 // Starts a build — returns { runId, buildNumber }
 export async function startBuild(project, branch, args) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}`, {
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ branch, args }),
@@ -98,7 +120,7 @@ export async function startBuild(project, branch, args) {
 
 // List runs for a project (no log content) — returns { runs, hasMore }
 export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
-  const r = await fetch(
+  const r = await apiFetch(
     `${BASE}/builds/${encodeURIComponent(project)}/runs?offset=${offset}&limit=${limit}`,
   );
   if (!r.ok) throw new Error(await r.text());
@@ -107,7 +129,7 @@ export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
 
 // Cancel a running build
 export async function cancelBuildRun(project, buildNumber) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`, {
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`, {
     method: "DELETE",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -116,7 +138,7 @@ export async function cancelBuildRun(project, buildNumber) {
 
 // Replay a finished build with the same branch + args
 export async function replayBuildRun(project, buildNumber) {
-  const r = await fetch(
+  const r = await apiFetch(
     `${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}/replay`,
     { method: "POST" },
   );
@@ -126,14 +148,14 @@ export async function replayBuildRun(project, buildNumber) {
 
 // FortiVPN service state on the backend host machine
 export async function getVpnStatus() {
-  const r = await fetch(`${BASE}/servers/vpn-status`);
+  const r = await apiFetch(`${BASE}/servers/vpn-status`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 // Streams VPN start/stop/restart output (runs locally on the backend machine)
 export async function vpnAction(action, onChunk, onDone) {
-  const r = await fetch(`${BASE}/servers/vpn/${action}`, { method: "POST" });
+  const r = await apiFetch(`${BASE}/servers/vpn/${action}`, { method: "POST" });
   if (!r.ok) {
     const err = await r.text();
     onChunk(`ERROR: ${err}\n`);
@@ -148,7 +170,7 @@ export const restartVpn = (onChunk, onDone) =>
 
 // Streams whitelist output
 export async function whitelistIp(env, onChunk, onDone) {
-  const r = await fetch(`${BASE}/awssg/whitelist`, {
+  const r = await apiFetch(`${BASE}/awssg/whitelist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ env }),
@@ -195,13 +217,13 @@ async function streamWithSentinel(r, onChunk, onDone) {
 // ─── Maintenance ─────────────────────────────────────────────────────────────
 
 export async function getMaintenance(env) {
-  const r = await fetch(`${BASE}/maintenance/${encodeURIComponent(env)}`);
+  const r = await apiFetch(`${BASE}/maintenance/${encodeURIComponent(env)}`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function setMaintenance(env, enabled) {
-  const r = await fetch(`${BASE}/maintenance/${encodeURIComponent(env)}`, {
+  const r = await apiFetch(`${BASE}/maintenance/${encodeURIComponent(env)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -221,7 +243,7 @@ export async function fetchHistory(
   const url = env
     ? `${BASE}/history/${encodeURIComponent(env)}?${params}`
     : `${BASE}/history?${params}`;
-  const r = await fetch(url);
+  const r = await apiFetch(url);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -229,13 +251,13 @@ export async function fetchHistory(
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 export async function fetchSettingsServers() {
-  const r = await fetch(`${BASE}/settings/servers`);
+  const r = await apiFetch(`${BASE}/settings/servers`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function createSettingsServer(body) {
-  const r = await fetch(`${BASE}/settings/servers`, {
+  const r = await apiFetch(`${BASE}/settings/servers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -245,7 +267,7 @@ export async function createSettingsServer(body) {
 }
 
 export async function updateSettingsServer(id, body) {
-  const r = await fetch(`${BASE}/settings/servers/${id}`, {
+  const r = await apiFetch(`${BASE}/settings/servers/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -255,19 +277,19 @@ export async function updateSettingsServer(id, body) {
 }
 
 export async function deleteSettingsServer(id) {
-  const r = await fetch(`${BASE}/settings/servers/${id}`, { method: "DELETE" });
+  const r = await apiFetch(`${BASE}/settings/servers/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function fetchNotifications() {
-  const r = await fetch(`${BASE}/settings/notifications`);
+  const r = await apiFetch(`${BASE}/settings/notifications`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function createNotification(body) {
-  const r = await fetch(`${BASE}/settings/notifications`, {
+  const r = await apiFetch(`${BASE}/settings/notifications`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -277,7 +299,7 @@ export async function createNotification(body) {
 }
 
 export async function updateNotification(id, body) {
-  const r = await fetch(`${BASE}/settings/notifications/${id}`, {
+  const r = await apiFetch(`${BASE}/settings/notifications/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -287,7 +309,7 @@ export async function updateNotification(id, body) {
 }
 
 export async function deleteNotification(id) {
-  const r = await fetch(`${BASE}/settings/notifications/${id}`, {
+  const r = await apiFetch(`${BASE}/settings/notifications/${id}`, {
     method: "DELETE",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -295,7 +317,7 @@ export async function deleteNotification(id) {
 }
 
 export async function testNotification(id) {
-  const r = await fetch(`${BASE}/settings/notifications/${id}/test`, {
+  const r = await apiFetch(`${BASE}/settings/notifications/${id}/test`, {
     method: "POST",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -303,13 +325,13 @@ export async function testNotification(id) {
 }
 
 export async function fetchCapRoverTargets() {
-  const r = await fetch(`${BASE}/settings/caprover-targets`);
+  const r = await apiFetch(`${BASE}/settings/caprover-targets`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function createCapRoverTarget(body) {
-  const r = await fetch(`${BASE}/settings/caprover-targets`, {
+  const r = await apiFetch(`${BASE}/settings/caprover-targets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -319,7 +341,7 @@ export async function createCapRoverTarget(body) {
 }
 
 export async function updateCapRoverTarget(id, body) {
-  const r = await fetch(`${BASE}/settings/caprover-targets/${id}`, {
+  const r = await apiFetch(`${BASE}/settings/caprover-targets/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -332,7 +354,7 @@ export async function updateCapRoverTarget(id, body) {
 // Test failures come back as 200 { ok: false, error } — proxies like
 // Cloudflare replace origin 5xx bodies with their own error page.
 export async function testCapRoverTarget(body) {
-  const r = await fetch(`${BASE}/settings/caprover-targets/test`, {
+  const r = await apiFetch(`${BASE}/settings/caprover-targets/test`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -342,7 +364,7 @@ export async function testCapRoverTarget(body) {
 }
 
 export async function deleteCapRoverTarget(id) {
-  const r = await fetch(`${BASE}/settings/caprover-targets/${id}`, {
+  const r = await apiFetch(`${BASE}/settings/caprover-targets/${id}`, {
     method: "DELETE",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -356,7 +378,7 @@ export async function deployRunToCapRover(
   targetId,
   imageName,
 ) {
-  const r = await fetch(
+  const r = await apiFetch(
     `${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}/deploy-caprover`,
     {
       method: "POST",
@@ -369,13 +391,13 @@ export async function deployRunToCapRover(
 }
 
 export async function fetchAppConfig(key) {
-  const r = await fetch(`${BASE}/settings/config/${key}`);
+  const r = await apiFetch(`${BASE}/settings/config/${key}`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function updateAppConfig(key, body) {
-  const r = await fetch(`${BASE}/settings/config/${key}`, {
+  const r = await apiFetch(`${BASE}/settings/config/${key}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -385,13 +407,13 @@ export async function updateAppConfig(key, body) {
 }
 
 export async function exportSettings() {
-  const r = await fetch(`${BASE}/settings/export`);
+  const r = await apiFetch(`${BASE}/settings/export`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function importSettings(payload) {
-  const r = await fetch(`${BASE}/settings/import`, {
+  const r = await apiFetch(`${BASE}/settings/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -403,13 +425,13 @@ export async function importSettings(payload) {
 // ─── Flyway ───────────────────────────────────────────────────────────────────
 
 export async function fetchFlywayEnvs() {
-  const r = await fetch(`${BASE}/flyway/envs`);
+  const r = await apiFetch(`${BASE}/flyway/envs`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function createFlywayEnv(body) {
-  const r = await fetch(`${BASE}/flyway/envs`, {
+  const r = await apiFetch(`${BASE}/flyway/envs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -419,7 +441,7 @@ export async function createFlywayEnv(body) {
 }
 
 export async function updateFlywayEnv(id, body) {
-  const r = await fetch(`${BASE}/flyway/envs/${id}`, {
+  const r = await apiFetch(`${BASE}/flyway/envs/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -429,13 +451,13 @@ export async function updateFlywayEnv(id, body) {
 }
 
 export async function deleteFlywayEnv(id) {
-  const r = await fetch(`${BASE}/flyway/envs/${id}`, { method: "DELETE" });
+  const r = await apiFetch(`${BASE}/flyway/envs/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function createFlywayDatabase(envId, body) {
-  const r = await fetch(`${BASE}/flyway/envs/${envId}/databases`, {
+  const r = await apiFetch(`${BASE}/flyway/envs/${envId}/databases`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -445,7 +467,7 @@ export async function createFlywayDatabase(envId, body) {
 }
 
 export async function updateFlywayDatabase(id, body) {
-  const r = await fetch(`${BASE}/flyway/databases/${id}`, {
+  const r = await apiFetch(`${BASE}/flyway/databases/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -455,13 +477,13 @@ export async function updateFlywayDatabase(id, body) {
 }
 
 export async function deleteFlywayDatabase(id) {
-  const r = await fetch(`${BASE}/flyway/databases/${id}`, { method: "DELETE" });
+  const r = await apiFetch(`${BASE}/flyway/databases/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function startFlywayRun(body) {
-  const r = await fetch(`${BASE}/flyway/run`, {
+  const r = await apiFetch(`${BASE}/flyway/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -471,13 +493,13 @@ export async function startFlywayRun(body) {
 }
 
 export async function fetchFlywayRuns() {
-  const r = await fetch(`${BASE}/flyway/runs`);
+  const r = await apiFetch(`${BASE}/flyway/runs`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
 export async function cancelFlywayRun(id) {
-  const r = await fetch(`${BASE}/flyway/runs/${id}`, { method: "DELETE" });
+  const r = await apiFetch(`${BASE}/flyway/runs/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -486,7 +508,7 @@ export async function cancelFlywayRun(id) {
 
 export async function fetchDeploySuggestions(env, service, { image = "", current = "" } = {}) {
   const params = new URLSearchParams({ image, current });
-  const r = await fetch(`${BASE}/deploy-suggestions/${encodeURIComponent(env)}/${encodeURIComponent(service)}?${params}`);
+  const r = await apiFetch(`${BASE}/deploy-suggestions/${encodeURIComponent(env)}/${encodeURIComponent(service)}?${params}`);
   if (!r.ok) throw await readError(r);
   return r.json();
 }
@@ -497,7 +519,7 @@ export function fetchVersionInfo(env, containerName, { stackPath, serviceName })
 
 // Single build run with full log — throws Error with .status (404 when missing)
 export async function fetchBuildRun(project, buildNumber) {
-  const r = await fetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`);
+  const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`);
   if (!r.ok) {
     const err = await readError(r);
     err.status = r.status;
@@ -508,7 +530,7 @@ export async function fetchBuildRun(project, buildNumber) {
 
 // Single flyway run with full log + env/db names — throws Error with .status
 export async function fetchFlywayRun(id) {
-  const r = await fetch(`${BASE}/flyway/runs/${id}`);
+  const r = await apiFetch(`${BASE}/flyway/runs/${id}`);
   if (!r.ok) {
     const err = await readError(r);
     err.status = r.status;

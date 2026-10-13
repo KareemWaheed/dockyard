@@ -11,6 +11,7 @@ import ContainerDrawer from '@/features/container/ContainerDrawer';
 import { ActivityPanel } from '@/features/activity/ActivityPanel';
 import { CommandPalette } from '@/features/palette/CommandPalette';
 import { OfflineBanner } from '@/app/OfflineBanner';
+import { SessionExpired } from '@/app/SessionExpired';
 import { PULL_THRESHOLD, usePullToRefresh } from '@/app/usePullToRefresh';
 
 export default function AppLayout() {
@@ -101,6 +102,7 @@ export default function AppLayout() {
         {activityOpen && <ActivityPanel />}
         <ContainerDrawer />
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        <SessionExpired />
       </div>
     </LayoutContext.Provider>
   );

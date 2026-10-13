@@ -9,7 +9,9 @@ import { routes } from './app/router';
 import { AppProviders } from './app/AppProviders';
 import { PwaUpdater } from './app/PwaUpdater';
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+// An expired SSO session won't fix itself on retry — fail fast and show the sign-in prompt.
+const retry = (failures, err) => !err?.sessionExpired && failures < 1;
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry } } });
 const router = createBrowserRouter(routes);
 
 ReactDOM.createRoot(document.getElementById('root')).render(

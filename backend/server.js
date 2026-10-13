@@ -33,6 +33,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/flyway', require('./routes/flyway'));
 app.use('/api/maintenance', require('./routes/maintenance'));
 app.use('/api/deploy-suggestions', require('./routes/suggestions'));
+app.use('/api/auth', require('./routes/auth'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }));
