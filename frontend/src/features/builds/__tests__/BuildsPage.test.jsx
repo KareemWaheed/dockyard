@@ -110,7 +110,7 @@ describe('BuildsPage', () => {
     renderApp('/builds');
     expect(await screen.findByText(/No build projects yet/)).toBeInTheDocument();
     // The sidebar also links to Settings — check the one in the empty state.
-    expect(within(screen.getByRole('main')).getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings');
+    expect(within(screen.getByRole('main')).getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings/build-projects');
   });
 
   it('opens the sheet prefilled from a run with ?from and clears both params on close', async () => {

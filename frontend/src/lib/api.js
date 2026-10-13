@@ -60,19 +60,19 @@ export async function containerAction(env, containerName, action, body) {
 
 export async function fetchBranches(project) {
   const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/branches`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function fetchProjects() {
   const r = await apiFetch(`${BASE}/builds/projects`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function fetchProjectRemote(project) {
   const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/remote`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -82,7 +82,7 @@ export async function updateProjectRemote(project, repoUrl) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repoUrl }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -96,14 +96,14 @@ export async function addService(env, stackIdx, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 // Starts a clone — returns { runId, buildNumber } or { alreadyCloned: true }
 export async function cloneRepo(project) {
   const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/clone`, { method: "POST" });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -114,7 +114,7 @@ export async function startBuild(project, branch, args) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ branch, args }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -123,7 +123,7 @@ export async function fetchBuildRuns(project, { offset = 0, limit = 20 } = {}) {
   const r = await apiFetch(
     `${BASE}/builds/${encodeURIComponent(project)}/runs?offset=${offset}&limit=${limit}`,
   );
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -132,7 +132,7 @@ export async function cancelBuildRun(project, buildNumber) {
   const r = await apiFetch(`${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}`, {
     method: "DELETE",
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -142,14 +142,14 @@ export async function replayBuildRun(project, buildNumber) {
     `${BASE}/builds/${encodeURIComponent(project)}/runs/${buildNumber}/replay`,
     { method: "POST" },
   );
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 // FortiVPN service state on the backend host machine
 export async function getVpnStatus() {
   const r = await apiFetch(`${BASE}/servers/vpn-status`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -218,7 +218,7 @@ async function streamWithSentinel(r, onChunk, onDone) {
 
 export async function getMaintenance(env) {
   const r = await apiFetch(`${BASE}/maintenance/${encodeURIComponent(env)}`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -228,7 +228,7 @@ export async function setMaintenance(env, enabled) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -244,7 +244,7 @@ export async function fetchHistory(
     ? `${BASE}/history/${encodeURIComponent(env)}?${params}`
     : `${BASE}/history?${params}`;
   const r = await apiFetch(url);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -252,7 +252,7 @@ export async function fetchHistory(
 
 export async function fetchSettingsServers() {
   const r = await apiFetch(`${BASE}/settings/servers`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -262,7 +262,7 @@ export async function createSettingsServer(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -272,19 +272,19 @@ export async function updateSettingsServer(id, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function deleteSettingsServer(id) {
   const r = await apiFetch(`${BASE}/settings/servers/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function fetchNotifications() {
   const r = await apiFetch(`${BASE}/settings/notifications`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -294,7 +294,7 @@ export async function createNotification(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -304,7 +304,7 @@ export async function updateNotification(id, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -312,7 +312,7 @@ export async function deleteNotification(id) {
   const r = await apiFetch(`${BASE}/settings/notifications/${id}`, {
     method: "DELETE",
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -320,13 +320,13 @@ export async function testNotification(id) {
   const r = await apiFetch(`${BASE}/settings/notifications/${id}/test`, {
     method: "POST",
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function fetchCapRoverTargets() {
   const r = await apiFetch(`${BASE}/settings/caprover-targets`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -336,7 +336,7 @@ export async function createCapRoverTarget(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -346,7 +346,7 @@ export async function updateCapRoverTarget(id, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -367,7 +367,7 @@ export async function deleteCapRoverTarget(id) {
   const r = await apiFetch(`${BASE}/settings/caprover-targets/${id}`, {
     method: "DELETE",
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -392,7 +392,7 @@ export async function deployRunToCapRover(
 
 export async function fetchAppConfig(key) {
   const r = await apiFetch(`${BASE}/settings/config/${key}`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -402,13 +402,13 @@ export async function updateAppConfig(key, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function exportSettings() {
   const r = await apiFetch(`${BASE}/settings/export`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -418,7 +418,7 @@ export async function importSettings(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -426,7 +426,7 @@ export async function importSettings(payload) {
 
 export async function fetchFlywayEnvs() {
   const r = await apiFetch(`${BASE}/flyway/envs`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -436,7 +436,7 @@ export async function createFlywayEnv(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -446,13 +446,13 @@ export async function updateFlywayEnv(id, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function deleteFlywayEnv(id) {
   const r = await apiFetch(`${BASE}/flyway/envs/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -462,7 +462,7 @@ export async function createFlywayDatabase(envId, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -472,13 +472,13 @@ export async function updateFlywayDatabase(id, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function deleteFlywayDatabase(id) {
   const r = await apiFetch(`${BASE}/flyway/databases/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
@@ -488,19 +488,19 @@ export async function startFlywayRun(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function fetchFlywayRuns() {
   const r = await apiFetch(`${BASE}/flyway/runs`);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 
 export async function cancelFlywayRun(id) {
   const r = await apiFetch(`${BASE}/flyway/runs/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await readError(r);
   return r.json();
 }
 

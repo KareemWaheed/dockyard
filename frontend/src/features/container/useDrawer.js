@@ -5,7 +5,7 @@ const TABS = ['deploy', 'logs', 'env', 'info', 'history'];
 
 // Drawer state lives in the URL:
 //   /env/:env/:container?tab=…            on environment pages
-//   <any path>?open=:env/:container&tab=… everywhere else (Overview, legacy pages)
+//   <any path>?open=:env/:container&tab=… everywhere else (Overview, History, …)
 export function useDrawer() {
   const match = useMatch('/env/:env/:container');
   const [search] = useSearchParams();
