@@ -34,4 +34,16 @@ describe('expired SSO session detection', () => {
       '/api/auth/reauth?next=%2Fenv%2Fprod%3Fopen%3Dprod%2Fweb%23x',
     );
   });
+
+  it('gives up on a hung config save', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((url, init) => new Promise((_, reject) => {
+      init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    })));
+    const p = api.updateAppConfig('awsSg', {});
+    const check = expect(p).rejects.toThrow(/didn't answer within 15s/);
+    await vi.advanceTimersByTimeAsync(api.SAVE_TIMEOUT_MS);
+    await check;
+    vi.useRealTimers();
+  });
 });

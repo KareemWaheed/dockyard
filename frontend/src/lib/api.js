@@ -398,14 +398,27 @@ export async function fetchAppConfig(key) {
   return r.json();
 }
 
+export const SAVE_TIMEOUT_MS = 15000;
+
+// Gives up on a hung save so the settings page (which waits for it before leaving) never stalls.
 export async function updateAppConfig(key, body) {
-  const r = await apiFetch(`${BASE}/settings/config/${key}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw await readError(r);
-  return r.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SAVE_TIMEOUT_MS);
+  try {
+    const r = await apiFetch(`${BASE}/settings/config/${key}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!r.ok) throw await readError(r);
+    return r.json();
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error(`The server didn't answer within ${SAVE_TIMEOUT_MS / 1000}s — the change may not be saved.`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function exportSettings() {
