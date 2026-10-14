@@ -235,6 +235,10 @@ try {
 try {
   db.exec("ALTER TABLE servers ADD COLUMN maintenance_flag_path TEXT");
 } catch {}
+// Disabled servers stay configured but are hidden from the UI and never contacted.
+try {
+  db.exec("ALTER TABLE servers ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1");
+} catch {}
 
 // Per-stack build/version metadata sources — JSON map of
 // { [serviceName]: { path, format: 'properties'|'json' } }

@@ -11,6 +11,9 @@ const path = require('path').posix;
 const { decryptField } = require('../encryption');
 const { shellQuote, isValidName } = require('../services/shell');
 const { composeCmd, INVALID_COMPOSE_CMD } = require('../services/validate');
+const { rejectDisabledEnv } = require('../services/server-enabled');
+
+router.param('env', rejectDisabledEnv);
 
 // Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
 const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;

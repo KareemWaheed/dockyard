@@ -29,9 +29,14 @@ export function useServers() {
   return useQuery({ queryKey: qk.servers, queryFn: fetchSettingsServers, staleTime: 60000 });
 }
 
-export function useEnvKeys() {
+// A missing flag (older backend) counts as enabled.
+export const isServerEnabled = (s) => s?.enabled !== 0 && s?.enabled !== false;
+
+// Enabled envs only: everything built on this (useAllEnvs, sidebar, overview…) never polls a
+// disabled server. Pass includeDisabled for lists that should still offer them (history filters, pickers).
+export function useEnvKeys({ includeDisabled = false } = {}) {
   const { data } = useServers();
-  return (data || []).map((s) => s.env_key);
+  return (data || []).filter((s) => includeDisabled || isServerEnabled(s)).map((s) => s.env_key);
 }
 
 export function envQueryOptions(env) {
