@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import { navigateFallbackDenylist } from './pwa.config.js';
 
 export default defineConfig({
   plugins: [
@@ -32,7 +33,7 @@ export default defineConfig({
         // App shell only — live ops data (/api, /ws, build-info.json) is never cached.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/ws\//],
+        navigateFallbackDenylist,
         cleanupOutdatedCaches: true,
       },
     }),
