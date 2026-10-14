@@ -282,6 +282,16 @@ export async function deleteSettingsServer(id) {
   return r.json();
 }
 
+export async function setServerEnabled(id, enabled) {
+  const r = await apiFetch(`${BASE}/settings/servers/${id}/enabled`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!r.ok) throw await readError(r);
+  return r.json();
+}
+
 export async function fetchNotifications() {
   const r = await apiFetch(`${BASE}/settings/notifications`);
   if (!r.ok) throw await readError(r);

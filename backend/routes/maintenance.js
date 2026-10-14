@@ -3,6 +3,9 @@ const db = require('../db');
 const { connect, exec } = require('../services/ssh');
 const { decryptField } = require('../encryption');
 const { shellQuote } = require('../services/shell');
+const { rejectDisabledEnv } = require('../services/server-enabled');
+
+router.param('env', rejectDisabledEnv);
 
 function getServerCfg(env) {
   const server = db.prepare('SELECT * FROM servers WHERE env_key = ?').get(env);

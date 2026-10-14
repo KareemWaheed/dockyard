@@ -29,7 +29,7 @@ export const toNotifier = (row) => ({ ...row, config: parse(row.config_json, {})
 const toBody = (n) => ({ type: n.type, label: n.label, config_json: n.config, enabled: n.enabled ? 1 : 0, envs_json: n.envs });
 
 function NotifierForm({ form, setForm }) {
-  const envKeys = useEnvKeys();
+  const envKeys = useEnvKeys({ includeDisabled: true });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setCfg = (k, v) => setForm((f) => ({ ...f, config: { ...f.config, [k]: v } }));
   const cfgInput = (k, props = {}) => (

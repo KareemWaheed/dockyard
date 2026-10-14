@@ -44,7 +44,7 @@ function TagChange({ row }) {
 }
 
 export default function HistoryPage() {
-  const envKeys = useEnvKeys();
+  const envKeys = useEnvKeys({ includeDisabled: true });
   const now = useNow(30000);
   const { openDrawer } = useDrawer();
   const { density } = useTheme();

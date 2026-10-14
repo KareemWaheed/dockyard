@@ -7,6 +7,9 @@ const { parseComposePs, parseBatchInspect } = require('../services/docker');
 const { getNote } = require('../notes');
 const { decryptField } = require('../encryption');
 const { shellQuote } = require('../services/shell');
+const { rejectDisabledEnv } = require('../services/server-enabled');
+
+router.param('env', rejectDisabledEnv);
 
 router.get('/:env/containers', async (req, res) => {
   const { env } = req.params;

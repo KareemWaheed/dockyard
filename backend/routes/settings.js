@@ -132,6 +132,19 @@ router.put("/servers/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+// Separate from PUT, which rewrites every field: body { enabled: boolean }.
+router.patch("/servers/:id/enabled", (req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled must be true or false" });
+  }
+  const server = db.prepare("SELECT env_key FROM servers WHERE id = ?").get(req.params.id);
+  if (!server) return res.status(404).json({ error: "Server not found" });
+  db.prepare("UPDATE servers SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, req.params.id);
+  if (!enabled) disconnect(server.env_key);
+  res.json({ ok: true });
+});
+
 router.delete("/servers/:id", (req, res) => {
   const { id } = req.params;
   const server = db.prepare("SELECT env_key FROM servers WHERE id = ?").get(id);
