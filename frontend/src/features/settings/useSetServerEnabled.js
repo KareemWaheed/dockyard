@@ -11,6 +11,8 @@ export function useSetServerEnabled() {
       success: `${server.env_key} ${enabled ? 'enabled' : 'disabled'}`,
       failure: `Could not ${enabled ? 'enable' : 'disable'} ${server.env_key}`,
       fn: () => setServerEnabled(server.id, enabled),
-      invalidate: [qk.servers, qk.containers(server.env_key)],
+      // Refreshing a just-disabled env's containers would only earn a 409; the servers refetch
+      // drops it from polling instead.
+      invalidate: enabled ? [qk.servers, qk.containers(server.env_key)] : [qk.servers],
     });
 }

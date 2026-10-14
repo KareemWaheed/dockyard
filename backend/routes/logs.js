@@ -62,6 +62,10 @@ module.exports = function attachLogs(httpServer) {
       );
       return ws.close();
     }
+    if (!server.enabled) {
+      ws.send(JSON.stringify({ type: "error", message: "Server is disabled" }));
+      return ws.close();
+    }
     const serverCfg = {
       host: server.host,
       ssh: {

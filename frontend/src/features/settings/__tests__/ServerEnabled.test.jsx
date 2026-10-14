@@ -62,6 +62,25 @@ describe('disabled servers', () => {
     expect(api.fetchContainers).not.toHaveBeenCalled();
   });
 
+  it("don't open the live container drawer (e.g. from History)", async () => {
+    renderApp('/history?open=dev/web&tab=history');
+    expect(await screen.findByText('dev is disabled')).toBeInTheDocument();
+    expect(api.fetchContainers).not.toHaveBeenCalledWith('dev');
+  });
+
+  it('stop being fetched the moment they are switched off', async () => {
+    renderApp('/settings/servers');
+    const user = userEvent.setup();
+    const stageSwitch = await screen.findByRole('switch', { name: 'Enable stage' });
+    await waitFor(() => expect(api.fetchContainers).toHaveBeenCalledWith('stage'));
+    api.fetchContainers.mockClear();
+    api.fetchSettingsServers.mockResolvedValue([{ ...stage, enabled: 0 }, dev]);
+    await user.click(stageSwitch);
+    await waitFor(() => expect(api.setServerEnabled).toHaveBeenCalledWith(1, false));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Enable stage' })).not.toBeChecked());
+    expect(api.fetchContainers).not.toHaveBeenCalledWith('stage');
+  });
+
   it('can be switched on and off from Settings', async () => {
     renderApp('/settings/servers');
     const user = userEvent.setup();

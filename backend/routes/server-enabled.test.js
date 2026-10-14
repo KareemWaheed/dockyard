@@ -35,6 +35,16 @@ app.use('/api/containers', require('./containers'));
 app.use('/api/maintenance', require('./maintenance'));
 app.use('/api/services', require('./services'));
 const server = http.createServer(app);
+require('./logs')(server);
+const WebSocket = require('ws');
+
+// First message the log socket sends for this env.
+const firstLogMessage = (port, env) => new Promise((resolve, reject) => {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/logs?env=${env}&container=web`);
+  ws.on('message', (m) => { resolve(JSON.parse(m.toString())); ws.close(); });
+  ws.on('error', reject);
+  setTimeout(() => { resolve({ timeout: true }); ws.terminate(); }, 3000);
+});
 
 server.listen(0, async () => {
   const base = `http://127.0.0.1:${server.address().port}/api`;
@@ -77,6 +87,8 @@ server.listen(0, async () => {
       assert.strictEqual(r.status, 409, `${m} ${url} should be 409 when disabled`);
       assert.strictEqual((await r.json()).error, 'Server is disabled');
     }
+    const logMsg = await firstLogMessage(server.address().port, 'dev');
+    assert.deepStrictEqual(logMsg, { type: 'error', message: 'Server is disabled' }, 'log stream refuses a disabled server');
     assert.strictEqual(connects, 0, 'no SSH connection to a disabled server');
 
     // Unknown envs still 404 (not 409).
