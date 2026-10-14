@@ -116,5 +116,7 @@ server.listen(0, async () => {
   } finally {
     server.close();
     db.close();
+    // The /ws/logs WebSocketServer keeps the HTTP server alive; end explicitly.
+    setImmediate(() => process.exit());
   }
 });
