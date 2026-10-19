@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { addTags } from '@/features/builds/buildArgs';
@@ -13,6 +13,10 @@ export function TagsInput({ id, value, onChange, onDraftChange, placeholder, req
     setDraftState(text);
     onDraftChange?.(text);
   };
+  // On unmount, clear the reported draft so the form never counts text the user can no longer see.
+  const onDraftChangeRef = useRef(onDraftChange);
+  useEffect(() => { onDraftChangeRef.current = onDraftChange; });
+  useEffect(() => () => onDraftChangeRef.current?.(''), []);
 
   const commit = (text) => {
     const { tags: next, invalid } = addTags(tags, text);

@@ -176,3 +176,19 @@ describe('review fixes (cubic, PR #7)', () => {
     expect(withPendingTags(tp, { tag: ['a'] }, { tag: '  ' })).toEqual({ values: { tag: ['a'] }, invalid: false });
   });
 });
+
+describe('review fixes round 2 (cubic, PR #7)', () => {
+  it('keeps a blank multiselect default empty', () => {
+    const mp = [{ name: 'mods', type: 'multiselect', flag: '-m', required: true, default: '' }];
+    expect(initFormState(mp)).toEqual({ mods: [] });
+    expect(buildArgs(mp, initFormState(mp))).toEqual([]);
+    expect(isFormValid(mp, initFormState(mp), 'main')).toBe(false);
+  });
+  it('drops invalid tags from defaults, saved values and old runs', () => {
+    const tp = [{ name: 'tag', type: 'tags', flag: '-t', default: 'ok,bad/tag' }];
+    expect(initFormState(tp)).toEqual({ tag: ['ok'] });
+    expect(initFormState(tp, { tag: ['x', '-lead'] })).toEqual({ tag: ['x'] });
+    expect(argsToValues(tp, JSON.stringify(['-t', 'a,bad/tag']))).toEqual({ tag: ['a'] });
+  });
+});
+

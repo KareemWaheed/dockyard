@@ -5,9 +5,11 @@
 const isList = (type) => type === 'multiselect' || type === 'tags';
 const splitTags = (v) => String(v).split(',').filter(Boolean);
 // Values saved before a param became 'tags' (or a comma-separated default) may be a plain string.
+// `||`, not `??`: Settings saves an untouched default as '', which must become [] (not ['']).
+// Tags from defaults/saved values get the same validation as typed ones: invalid entries are dropped.
 const toList = (type, v) => {
-  const list = [].concat(v ?? []);
-  return type === 'tags' ? list.flatMap(splitTags) : list;
+  const list = [].concat(v || []);
+  return type === 'tags' ? addTags([], list.join(',')).tags : list;
 };
 
 // Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
@@ -146,7 +148,7 @@ export function argsToValues(params = [], argsJson) {
       values[p.name] = args.filter((a, i) => i > 0 && args[i - 1] === p.flag);
     } else {
       const i = args.indexOf(p.flag);
-      if (i !== -1 && i + 1 < args.length) values[p.name] = p.type === 'tags' ? splitTags(args[i + 1]) : args[i + 1];
+      if (i !== -1 && i + 1 < args.length) values[p.name] = p.type === 'tags' ? toList('tags', args[i + 1]) : args[i + 1];
     }
   }
   return values;

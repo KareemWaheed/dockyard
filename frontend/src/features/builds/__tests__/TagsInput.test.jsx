@@ -69,3 +69,15 @@ describe('TagsInput review fixes (cubic, PR #7)', () => {
     expect(onChange).toHaveBeenLastCalledWith(['foo', 'bar', 'baz']);
   });
 });
+
+describe('TagsInput unmount', () => {
+  it('clears the reported draft when it unmounts', async () => {
+    const onDraftChange = vi.fn();
+    const { unmount } = render(<TagsInput id="t" value={[]} onChange={() => {}} onDraftChange={onDraftChange} />);
+    await userEvent.type(screen.getByRole('textbox'), 'abc');
+    expect(onDraftChange).toHaveBeenLastCalledWith('abc');
+    unmount();
+    expect(onDraftChange).toHaveBeenLastCalledWith('');
+  });
+});
+
