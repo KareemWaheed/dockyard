@@ -1,9 +1,14 @@
 // Pure helpers for the build form and for reading finished runs. Ported from the pre-rebuild Builds page.
 
+// List-valued params. 'tags' is free-form image tags, passed to build scripts as ONE
+// comma-separated value (-t stage-latest,prod-latest) — unlike multiselect, which repeats the flag.
+const isList = (type) => type === 'multiselect' || type === 'tags';
+const splitTags = (v) => String(v).split(',').filter(Boolean);
+
 export function initFormState(params = [], saved = {}) {
   const state = {};
   for (const p of params) {
-    if (p.type === 'multiselect') state[p.name] = p.default || [];
+    if (isList(p.type)) state[p.name] = [].concat(p.default || []);
     else if (p.type === 'checkbox') state[p.name] = p.default || false;
     else state[p.name] = p.default || '';
     if (saved && Object.prototype.hasOwnProperty.call(saved, p.name)) state[p.name] = saved[p.name];
@@ -19,6 +24,8 @@ export function buildArgs(params = [], values = {}) {
       if (val) args.push(p.flag);
     } else if (p.type === 'multiselect') {
       if (Array.isArray(val)) val.forEach((item) => args.push(p.flag, item));
+    } else if (p.type === 'tags') {
+      if (Array.isArray(val) && val.length) args.push(p.flag, val.join(','));
     } else if (val) {
       args.push(p.flag, val);
     }
@@ -32,7 +39,7 @@ export function isFormValid(params = [], values = {}, branch = '') {
     if (!p.required) return true;
     const val = values[p.name];
     if (p.type === 'checkbox') return val === true;
-    return p.type === 'multiselect' ? Array.isArray(val) && val.length > 0 : !!val;
+    return isList(p.type) ? Array.isArray(val) && val.length > 0 : !!val;
   });
 }
 
@@ -63,7 +70,7 @@ export function parseArgs(params, argsJson, branch) {
       if (vals.length) rows.push({ label, value: vals.join(', ') });
     } else {
       const i = args.indexOf(p.flag);
-      if (i !== -1 && i + 1 < args.length) rows.push({ label, value: args[i + 1] });
+      if (i !== -1 && i + 1 < args.length) rows.push({ label, value: p.type === 'tags' ? splitTags(args[i + 1]).join(', ') : args[i + 1] });
     }
   }
   return rows;
@@ -104,19 +111,19 @@ export function argsToValues(params = [], argsJson) {
       values[p.name] = args.filter((a, i) => i > 0 && args[i - 1] === p.flag);
     } else {
       const i = args.indexOf(p.flag);
-      if (i !== -1 && i + 1 < args.length) values[p.name] = args[i + 1];
+      if (i !== -1 && i + 1 < args.length) values[p.name] = p.type === 'tags' ? splitTags(args[i + 1]) : args[i + 1];
     }
   }
   return values;
 }
 
-// The image-tag param, if the project has one: a string param named or labelled "tag".
+// The image-tag param, if the project has one: a string or tags param named or labelled "tag".
 // Words in a name or label: splits on non-letters and camelCase ("imageTag" → image, tag).
 const words = (s) => (s || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter(Boolean);
 
 export function tagParamOf(params = []) {
   // Whole word only: "stage" or "staging" must not count as the image tag.
-  return params.find((p) => p.type === 'string' && [...words(p.name), ...words(p.label)].includes('tag')) ?? null;
+  return params.find((p) => (p.type === 'string' || p.type === 'tags') && [...words(p.name), ...words(p.label)].includes('tag')) ?? null;
 }
 
 // A trailing "-<digits>" is a build counter when it has 2+ digits or follows a dotted version
@@ -141,4 +148,13 @@ export function nextTag(tag, knownTags = []) {
     if (s && s.base === base) max = Math.max(max, s.n);
   }
   return `${base}-${String(max + 1).padStart(width, '0')}`;
+}
+
+// "Rebuild with next tag" for a tag param's value. A string tag always bumps. In a tag list only
+// tags with a build counter bump (dal-stg-1.0.0-2060 → -2061); floating tags such as stage-latest
+// are kept as-is. Returns null when nothing in the list can bump.
+export function nextTagValue(value, knownTags = []) {
+  if (!Array.isArray(value)) return value ? nextTag(value, knownTags) : null;
+  if (!value.some((t) => splitCounter(t))) return null;
+  return value.map((t) => (splitCounter(t) ? nextTag(t, knownTags) : t));
 }

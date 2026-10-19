@@ -1,0 +1,72 @@
+import { useState } from 'react';
+import { X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+// Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+
+// Split typed or pasted text on commas/whitespace into tags, merged into `existing` without duplicates.
+// Entries that aren't valid docker tags come back in `invalid` instead of being added.
+export function addTags(existing, text) {
+  const tags = [...existing];
+  const invalid = [];
+  for (const raw of text.split(/[,\s]+/)) {
+    if (!raw) continue;
+    if (!TAG_RE.test(raw)) invalid.push(raw);
+    else if (!tags.includes(raw)) tags.push(raw);
+  }
+  return { tags, invalid };
+}
+
+export function TagsInput({ id, value, onChange, placeholder, required }) {
+  const tags = Array.isArray(value) ? value : [];
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+
+  const commit = (text) => {
+    const { tags: next, invalid } = addTags(tags, text);
+    if (next.length !== tags.length) onChange(next);
+    setError(invalid.length ? `Not a valid image tag: ${invalid.join(', ')}` : '');
+    setDraft(invalid.join(','));
+  };
+
+  const onKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && draft.trim()) {
+      e.preventDefault();
+      commit(draft);
+    } else if (e.key === 'Backspace' && !draft && tags.length) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border border-input px-2 py-1.5 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+        {tags.map((t) => (
+          <Badge key={t} variant="secondary" className="h-7 gap-1 rounded-md pr-1 font-mono text-xs">
+            {t}
+            <button type="button" className="rounded-sm p-0.5 hover:text-bad" aria-label={`Remove tag ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </Badge>
+        ))}
+        <input
+          id={id}
+          className="h-7 min-w-32 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground md:text-sm"
+          value={draft}
+          aria-invalid={!!error}
+          aria-required={required}
+          onChange={(e) => { setDraft(e.target.value); setError(''); }}
+          onKeyDown={onKeyDown}
+          onBlur={() => draft.trim() && commit(draft)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text');
+            if (/[,\s]/.test(text.trim())) { e.preventDefault(); commit(draft + text); }
+          }}
+          placeholder={tags.length ? '' : placeholder || 'Type a tag, press Enter'}
+        />
+      </div>
+      {error && <p role="alert" className="text-xs text-bad">{error}</p>}
+    </div>
+  );
+}

@@ -12,7 +12,7 @@ import { RunStatusBadge } from '@/features/runs/RunStatusBadge';
 import { isActive, toIso } from '@/features/runs/runStatus';
 import { useRunCommand } from '@/features/runs/useRunCommand';
 import { useRunStream } from '@/features/runs/useRunStream';
-import { argsToValues, buildArgs, nextTag, parseArgs, parseDeployMeta, parseJsonArray, tagParamOf } from '@/features/builds/buildArgs';
+import { argsToValues, buildArgs, nextTagValue, parseArgs, parseDeployMeta, parseJsonArray, tagParamOf } from '@/features/builds/buildArgs';
 import { DeployBar } from '@/features/builds/DeployBar';
 
 const formatStarted = (s) => (s ? new Date(toIso(s)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
@@ -92,13 +92,14 @@ export function RunDetail({ project, run, params, targets, knownTags = [] }) {
 
   const tagParam = run.type === 'build' ? tagParamOf(params) : null;
   const values = tagParam ? argsToValues(params, merged.args_json) : null;
-  const bumped = tagParam && values[tagParam.name] ? nextTag(values[tagParam.name], knownTags) : '';
+  const bumped = tagParam ? nextTagValue(values[tagParam.name], knownTags) : null;
+  const bumpedText = [].concat(bumped || []).join(', ');
 
   const rebuildNextTag = async () => {
     const r = await runCommand({
-      pending: `Starting a build of ${bumped}…`,
-      success: (res) => `Build #${res.buildNumber} ${res.queued ? 'queued' : 'started'} as ${bumped}`,
-      failure: `Could not build ${bumped}`,
+      pending: `Starting a build of ${bumpedText}…`,
+      success: (res) => `Build #${res.buildNumber} ${res.queued ? 'queued' : 'started'} as ${bumpedText}`,
+      failure: `Could not build ${bumpedText}`,
       fn: () => startBuild(project, merged.branch, buildArgs(params, { ...values, [tagParam.name]: bumped })),
       invalidate: [qk.buildRuns(project)],
     });
@@ -129,7 +130,7 @@ export function RunDetail({ project, run, params, targets, knownTags = [] }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={rebuild}>Same parameters</DropdownMenuItem>
-                {bumped && <DropdownMenuItem onSelect={rebuildNextTag}>Next tag: {bumped}</DropdownMenuItem>}
+                {bumped && <DropdownMenuItem onSelect={rebuildNextTag}>Next tag: {bumpedText}</DropdownMenuItem>}
                 <DropdownMenuItem onSelect={() => navigate({ search: `?new=1&from=${n}` })}>Change parameters…</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

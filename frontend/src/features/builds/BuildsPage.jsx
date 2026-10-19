@@ -208,7 +208,7 @@ export default function BuildsPage() {
   const knownTags = tagParam
     ? [...runs, ...(tagHistoryQ.data?.runs || [])]
         .filter((r) => r.type === 'build')
-        .map((r) => argsToValues(def.params, r.args_json)[tagParam.name])
+        .flatMap((r) => [].concat(argsToValues(def.params, r.args_json)[tagParam.name] || []))
         .filter(Boolean)
     : [];
 

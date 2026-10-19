@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, tagParamOf, argsToValues } from '@/features/builds/buildArgs';
+import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, nextTagValue, tagParamOf, argsToValues } from '@/features/builds/buildArgs';
 
 const params = [
   { name: 'tag', type: 'string', flag: '--tag', label: 'Tag', required: true },
@@ -121,4 +121,42 @@ describe('review fixes (cubic #37, #38)', () => {
     expect(isFormValid(p, { ack: true }, 'main')).toBe(true);
   });
 });
+});
+
+describe('tags param type', () => {
+  const tp = [{ name: 'tag', type: 'tags', flag: '-t', label: 'Tag', required: true }];
+  it('defaults to an empty list', () => {
+    expect(initFormState(tp)).toEqual({ tag: [] });
+    expect(initFormState([{ ...tp[0], default: ['a'] }])).toEqual({ tag: ['a'] });
+  });
+  it('passes all tags as one comma-separated value', () => {
+    expect(buildArgs(tp, { tag: ['stage-latest', 'prod-latest'] })).toEqual(['-t', 'stage-latest,prod-latest']);
+    expect(buildArgs(tp, { tag: [] })).toEqual([]);
+  });
+  it('requires at least one tag when required', () => {
+    expect(isFormValid(tp, { tag: [] }, 'main')).toBe(false);
+    expect(isFormValid(tp, { tag: ['x'] }, 'main')).toBe(true);
+  });
+  it('reads a run back into a list, and shows it comma-separated', () => {
+    const json = JSON.stringify(['-t', 'stage-latest,prod-latest']);
+    expect(argsToValues(tp, json)).toEqual({ tag: ['stage-latest', 'prod-latest'] });
+    expect(parseArgs(tp, json, '')).toEqual([{ label: 'Tag', value: 'stage-latest, prod-latest' }]);
+  });
+  it('counts as the image-tag param', () => {
+    expect(tagParamOf(tp).name).toBe('tag');
+  });
+});
+
+describe('nextTagValue', () => {
+  it('bumps a string tag like nextTag', () => {
+    expect(nextTagValue('dal-stg-01', ['dal-stg-03'])).toBe('dal-stg-04');
+    expect(nextTagValue('')).toBeNull();
+  });
+  it('bumps only counter tags in a list and keeps floating tags', () => {
+    expect(nextTagValue(['dal-stg-1.0.0-2060', 'stage-latest'], ['dal-stg-1.0.0-2070'])).toEqual(['dal-stg-1.0.0-2071', 'stage-latest']);
+  });
+  it('returns null when no tag in the list has a counter', () => {
+    expect(nextTagValue(['stage-latest', 'prod-latest'])).toBeNull();
+    expect(nextTagValue([])).toBeNull();
+  });
 });
