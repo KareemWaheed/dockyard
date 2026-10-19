@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Tag } from '@/components/status';
 import { createSettingsServer, deleteSettingsServer, updateSettingsServer } from '@/lib/api';
-import { qk, useServers } from '@/lib/queries';
+import { isServerEnabled, qk, useServers } from '@/lib/queries';
+import { useSetServerEnabled } from '@/features/settings/useSetServerEnabled';
 import { useRunCommand } from '@/features/runs/useRunCommand';
 import { isProd } from '@/features/container/actions';
 import { Card, EmptyNote, Field, FormSheet, LoadError, LoadingList, SectionHeader, textareaClass } from '@/features/settings/ui';
@@ -178,6 +180,7 @@ function ServerForm({ form, setForm, editing }) {
 
 export default function ServersSection() {
   const runCommand = useRunCommand();
+  const setEnabled = useSetServerEnabled();
   const q = useServers();
   const [editing, setEditing] = useState(null); // null | 'new' | server
   const [form, setForm] = useState(null);
@@ -242,10 +245,11 @@ export default function ServersSection() {
           {servers.map((s) => (
             <li key={s.id}>
               <Card className="flex flex-wrap items-start gap-3">
-                <div className="min-w-0 flex-1 space-y-1.5">
+                <div className={`min-w-0 flex-1 space-y-1.5 ${isServerEnabled(s) ? '' : 'opacity-60'}`}>
                   <div className="flex flex-wrap items-center gap-2">
                     <Tag className="uppercase">{s.env_key}</Tag>
                     <span className="font-medium">{s.name}</span>
+                    {!isServerEnabled(s) && <Tag>Disabled</Tag>}
                     <span className="font-mono text-xs text-muted-foreground">{s.ssh_username}@{s.host}</span>
                   </div>
                   {s.stacks.length > 0 ? (
@@ -261,7 +265,11 @@ export default function ServersSection() {
                     <p className="text-xs text-warn">No Compose stacks configured.</p>
                   )}
                 </div>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1">
+                  {/* Off: hidden everywhere and never contacted, settings kept. */}
+                  <label className="flex h-10 cursor-pointer items-center px-2">
+                    <Switch aria-label={`Enable ${s.env_key}`} checked={isServerEnabled(s)} onCheckedChange={(v) => setEnabled(s, v === true)} />
+                  </label>
                   <Button variant="ghost" size="icon" className="size-10" aria-label={`Edit ${s.env_key}`} onClick={() => openEdit(s)}><Pencil className="size-4" /></Button>
                   <Button variant="ghost" size="icon" className="size-10 text-bad hover:text-bad" aria-label={`Remove ${s.env_key}`} onClick={() => remove(s)}><Trash2 className="size-4" /></Button>
                 </div>

@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAllEnvs, useServers } from '@/lib/queries';
+import { isServerEnabled, useAllEnvs, useServers } from '@/lib/queries';
 import { usePref } from '@/lib/storage';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
@@ -57,6 +57,21 @@ export default function OverviewPage() {
             <p className="mb-1 text-[15px] font-semibold">No servers yet</p>
             <p className="mb-4 text-muted-foreground">Dockyard connects to your servers over SSH and reads their compose files.</p>
             <Button asChild><Link to="/settings/servers">Add your first server</Link></Button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (servers.isSuccess && !servers.data.some(isServerEnabled)) {
+    return (
+      <>
+        <PageHeader title="Overview" />
+        <div className="p-6">
+          <div className="mx-auto max-w-md rounded-xl border bg-card p-6 text-center">
+            <p className="mb-1 text-[15px] font-semibold">All servers are disabled</p>
+            <p className="mb-4 text-muted-foreground">Turn one back on to see its containers here.</p>
+            <Button asChild><Link to="/settings/servers">Manage servers</Link></Button>
           </div>
         </div>
       </>

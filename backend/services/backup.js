@@ -72,10 +72,10 @@ function importConfig(db, payload) {
           `
         INSERT INTO servers (env_key, name, host, ssh_username, ssh_password, ssh_key_path,
                              ssh_key_content, ssh_passphrase, docker_compose_cmd, aws_sg_id,
-                             maintenance_flag_path)
+                             maintenance_flag_path, enabled)
         VALUES (@env_key, @name, @host, @ssh_username, @ssh_password, @ssh_key_path,
                 @ssh_key_content, @ssh_passphrase, @docker_compose_cmd, @aws_sg_id,
-                @maintenance_flag_path)
+                @maintenance_flag_path, @enabled)
       `
         )
         .run({
@@ -86,6 +86,7 @@ function importConfig(db, payload) {
           docker_compose_cmd: "docker compose",
           aws_sg_id: null,
           maintenance_flag_path: null,
+          enabled: 1,
           ...row,
           ssh_password: encrypt(row.ssh_password || null),
           ssh_key_content: encrypt(row.ssh_key_content || null),

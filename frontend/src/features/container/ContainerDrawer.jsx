@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { findContainer } from '@/lib/containers';
-import { useEnvContainers } from '@/lib/queries';
+import { isServerEnabled, useEnvContainers, useServers } from '@/lib/queries';
 import { usePref } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useDrawer } from '@/features/container/useDrawer';
@@ -59,7 +59,13 @@ function Shell({ children, label, width, expanded, onResizeStart }) {
 
 export default function ContainerDrawer() {
   const { open, tab, setTab, closeDrawer } = useDrawer();
-  const q = useEnvContainers(open?.env);
+  const serversQ = useServers();
+  const server = serversQ.data?.find?.((s) => s.env_key === open?.env);
+  // Opened for a disabled env (e.g. from History): never fetch it or show cached controls.
+  // Wait for the server list first; if it can't load, behave as before.
+  const disabled = !!server && !isServerEnabled(server);
+  const q = useEnvContainers(!serversQ.isPending && !disabled ? open?.env : null);
+  const loading = q.isLoading || serversQ.isPending;
   const [width, setWidth] = usePref('drawerWidth', 440);
   const [expanded, setExpanded] = useState(false);
   const dragging = useRef(false);
@@ -100,7 +106,7 @@ export default function ContainerDrawer() {
   // name yet (no container to name it after) — keep it generic so consumers that
   // find the drawer by `${container} on ${env}` wait for the loaded state instead
   // of matching the transient loading shell.
-  const label = q.isLoading || q.isPlaceholderData ? 'Loading container' : `${open.container} on ${open.env}`;
+  const label = loading || q.isPlaceholderData ? 'Loading container' : `${open.container} on ${open.env}`;
   const shellProps = { label, width, expanded, onResizeStart };
 
   const tabs = container ? drawerTabs(container, open.env) : [];
@@ -109,13 +115,18 @@ export default function ContainerDrawer() {
   return (
     <ExpandedContext.Provider value={[expanded, setExpanded]}>
       <Shell {...shellProps}>
-        {!container ? (
+        {disabled ? (
+          <div className="flex items-center justify-between border-b p-4">
+            <p className="font-medium">{open.env} is disabled</p>
+            <Button size="icon" variant="ghost" aria-label="Close" onClick={closeDrawer}><X className="size-4" /></Button>
+          </div>
+        ) : !container ? (
           <>
             <div className="flex items-center justify-between border-b p-4">
-              <p className="font-medium">{q.isLoading ? 'Loading…' : q.data ? `Container not found in ${open.env}` : `Can't load ${open.env}`}</p>
+              <p className="font-medium">{loading ? 'Loading…' : q.data ? `Container not found in ${open.env}` : `Can't load ${open.env}`}</p>
               <Button size="icon" variant="ghost" aria-label="Close" onClick={closeDrawer}><X className="size-4" /></Button>
             </div>
-            {!q.isLoading && q.error && <p className="p-4 font-mono text-xs text-bad">{q.error.message}</p>}
+            {!loading && q.error && <p className="p-4 font-mono text-xs text-bad">{q.error.message}</p>}
           </>
         ) : (
           <>

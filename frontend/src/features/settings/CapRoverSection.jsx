@@ -20,7 +20,7 @@ export function describeTest(r) {
 
 export default function CapRoverSection() {
   const runCommand = useRunCommand();
-  const envKeys = useEnvKeys();
+  const envKeys = useEnvKeys({ includeDisabled: true });
   const q = useQuery({ queryKey: qk.caproverTargets, queryFn: fetchCapRoverTargets });
   const projectsQ = useQuery({ queryKey: qk.buildProjects, queryFn: fetchProjects, staleTime: 5 * 60000 });
   const projects = projectsQ.data || {};

@@ -5,6 +5,9 @@ const { appendService } = require('../services/compose');
 const { decryptField } = require('../encryption');
 const { shellQuote, isValidName } = require('../services/shell');
 const { composeCmd, INVALID_COMPOSE_CMD } = require('../services/validate');
+const { rejectDisabledEnv } = require('../services/server-enabled');
+
+router.param('env', rejectDisabledEnv);
 
 // POST /api/services/:env/:stackIdx
 // body: { name, image, ports, environment, restart }
