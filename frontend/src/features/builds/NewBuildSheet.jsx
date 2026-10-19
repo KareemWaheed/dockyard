@@ -8,7 +8,7 @@ import { cloneRepo, fetchBranches, startBuild } from '@/lib/api';
 import { qk } from '@/lib/queries';
 import { ComboPicker } from '@/features/runs/ComboPicker';
 import { useRunCommand } from '@/features/runs/useRunCommand';
-import { argsToValues, buildArgs, initFormState, isFormValid } from '@/features/builds/buildArgs';
+import { argsToValues, buildArgs, initFormState, isFormValid, withPendingTags } from '@/features/builds/buildArgs';
 import { loadRecent, saveRecent } from '@/features/builds/recentStore';
 import { ParamField } from '@/features/builds/ParamField';
 
@@ -18,11 +18,13 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
   const branchesQ = useQuery({ queryKey: qk.branches(project), queryFn: () => fetchBranches(project), enabled: open && !!project, staleTime: 30000 });
   const [branch, setBranch] = useState('');
   const [values, setValues] = useState({});
+  const [pendingTags, setPendingTags] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [cloning, setCloning] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setPendingTags({});
     if (fromRun) {
       // "Change parameters…" on a run: start from exactly what that run used.
       setValues(argsToValues(params, fromRun.args_json));
@@ -41,18 +43,21 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
   }, [open, branch, branches]);
 
   const needsClone = !!branchesQ.data?.needsClone;
-  const valid = !needsClone && isFormValid(params, values, branch);
+  // Typed-but-uncommitted tag text counts; invalid pending text blocks Build.
+  const pending = withPendingTags(params, values, pendingTags);
+  const entered = pending.values;
+  const valid = !needsClone && !pending.invalid && isFormValid(params, entered, branch);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!valid || submitting) return;
     setSubmitting(true);
-    saveRecent(project, { branch, values });
+    saveRecent(project, { branch, values: entered });
     const r = await runCommand({
       pending: `Starting ${def.name} build…`,
       success: (res) => `Build #${res.buildNumber} ${res.queued ? 'queued' : 'started'}`,
       failure: 'Could not start the build',
-      fn: () => startBuild(project, branch, buildArgs(params, values)),
+      fn: () => startBuild(project, branch, buildArgs(params, entered)),
       invalidate: [qk.buildRuns(project)],
     });
     setSubmitting(false);
@@ -104,7 +109,7 @@ export function NewBuildSheet({ project, def, fromRun, open, onOpenChange, onSta
           <ComboPicker id="build-branch" mono options={branches.map((b) => ({ value: b, label: b }))} value={branch} onChange={setBranch} placeholder="Select branch…" searchLabel="Search branches" emptyText="No matching branch." />
         </div>
         {params.map((p) => (
-          <ParamField key={p.name} param={p} value={values[p.name]} onChange={(v) => setValues((prev) => ({ ...prev, [p.name]: v }))} />
+          <ParamField key={p.name} param={p} value={values[p.name]} onChange={(v) => setValues((prev) => ({ ...prev, [p.name]: v }))} onDraftChange={(t) => setPendingTags((prev) => ({ ...prev, [p.name]: t }))} />
         ))}
       </div>
     );

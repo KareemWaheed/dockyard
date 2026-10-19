@@ -13,7 +13,7 @@ import { useDialogs } from '@/app/DialogProvider';
 import { useRunCommand } from '@/features/runs/useRunCommand';
 import { Card, EmptyNote, Field, LoadError, LoadingList, SaveBar, SectionHeader, SwitchField, settingsKeys, useConfigDraft } from '@/features/settings/ui';
 
-const PARAM_TYPES = ['string', 'select', 'checkbox', 'multiselect'];
+const PARAM_TYPES = ['string', 'select', 'checkbox', 'multiselect', 'tags'];
 const emptyParam = () => ({ name: '', label: '', type: 'string', flag: '', required: false, default: '', placeholder: '', options: [] });
 
 export const parseList = (text) => text.split(',').map((s) => s.trim()).filter(Boolean);
@@ -36,7 +36,7 @@ function ListInput({ value, onChange, ...props }) {
 
 function ParamCard({ p, i, count, update, move, remove }) {
   const id = (f) => `param-${i}-${f}`;
-  const multi = p.type === 'multiselect';
+  const multi = p.type === 'multiselect' || p.type === 'tags';
   return (
     <li className="space-y-3 rounded-lg border p-3">
       <div className="flex items-center gap-2">
@@ -59,13 +59,13 @@ function ParamCard({ p, i, count, update, move, remove }) {
         <Field label="Flag" htmlFor={id('flag')}><Input id={id('flag')} className="h-10 font-mono" placeholder="-tag" value={p.flag} onChange={(e) => update(i, 'flag', e.target.value)} /></Field>
         <Field label={multi ? 'Default (comma-separated)' : 'Default'} htmlFor={id('default')}>
           {multi ? (
-            <ListInput id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default : []} onChange={(v) => update(i, 'default', v)} />
+            <ListInput id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default : parseList(String(p.default ?? ''))} onChange={(v) => update(i, 'default', v)} />
           ) : (
             <Input id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default.join(', ') : p.default ?? ''} onChange={(e) => update(i, 'default', e.target.value)} />
           )}
         </Field>
         <Field label="Placeholder" htmlFor={id('placeholder')}><Input id={id('placeholder')} className="h-10" value={p.placeholder || ''} onChange={(e) => update(i, 'placeholder', e.target.value)} /></Field>
-        {(p.type === 'select' || multi) && (
+        {(p.type === 'select' || p.type === 'multiselect') && (
           <Field label="Options (comma-separated)" htmlFor={id('options')} className="sm:col-span-2">
             <ListInput id={id('options')} className="h-10" value={p.options || []} onChange={(v) => update(i, 'options', v)} />
           </Field>

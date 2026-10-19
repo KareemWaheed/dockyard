@@ -3,8 +3,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { TagsInput } from '@/features/builds/TagsInput';
 
-export function ParamField({ param, value, onChange }) {
+export function ParamField({ param, value, onChange, onDraftChange }) {
   const { type, label, name, options = [], required, placeholder, flag } = param;
   const id = `param-${name}`;
   const text = label || name;
@@ -30,6 +31,14 @@ export function ParamField({ param, value, onChange }) {
       <div className="space-y-1.5">
         <Label htmlFor={id}>{heading}</Label>
         <Input id={id} className="h-10" required={required} value={value || ''} placeholder={placeholder || ''} onChange={(e) => onChange(e.target.value)} onBlur={(e) => onChange(e.target.value.trim())} />
+      </div>
+    );
+  }
+  if (type === 'tags') {
+    return (
+      <div className="space-y-1.5">
+        <Label htmlFor={id}>{heading}</Label>
+        <TagsInput id={id} required={required} value={value} placeholder={placeholder} onChange={onChange} onDraftChange={onDraftChange} />
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, tagParamOf, argsToValues } from '@/features/builds/buildArgs';
+import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, nextTagValue, tagParamOf, argsToValues, withPendingTags } from '@/features/builds/buildArgs';
 
 const params = [
   { name: 'tag', type: 'string', flag: '--tag', label: 'Tag', required: true },
@@ -122,3 +122,73 @@ describe('review fixes (cubic #37, #38)', () => {
   });
 });
 });
+
+describe('tags param type', () => {
+  const tp = [{ name: 'tag', type: 'tags', flag: '-t', label: 'Tag', required: true }];
+  it('defaults to an empty list', () => {
+    expect(initFormState(tp)).toEqual({ tag: [] });
+    expect(initFormState([{ ...tp[0], default: ['a'] }])).toEqual({ tag: ['a'] });
+  });
+  it('passes all tags as one comma-separated value', () => {
+    expect(buildArgs(tp, { tag: ['stage-latest', 'prod-latest'] })).toEqual(['-t', 'stage-latest,prod-latest']);
+    expect(buildArgs(tp, { tag: [] })).toEqual([]);
+  });
+  it('requires at least one tag when required', () => {
+    expect(isFormValid(tp, { tag: [] }, 'main')).toBe(false);
+    expect(isFormValid(tp, { tag: ['x'] }, 'main')).toBe(true);
+  });
+  it('reads a run back into a list, and shows it comma-separated', () => {
+    const json = JSON.stringify(['-t', 'stage-latest,prod-latest']);
+    expect(argsToValues(tp, json)).toEqual({ tag: ['stage-latest', 'prod-latest'] });
+    expect(parseArgs(tp, json, '')).toEqual([{ label: 'Tag', value: 'stage-latest, prod-latest' }]);
+  });
+  it('counts as the image-tag param', () => {
+    expect(tagParamOf(tp).name).toBe('tag');
+  });
+});
+
+describe('nextTagValue', () => {
+  it('bumps a string tag like nextTag', () => {
+    expect(nextTagValue('dal-stg-01', ['dal-stg-03'])).toBe('dal-stg-04');
+    expect(nextTagValue('')).toBeNull();
+  });
+  it('bumps only counter tags in a list and keeps floating tags', () => {
+    expect(nextTagValue(['dal-stg-1.0.0-2060', 'stage-latest'], ['dal-stg-1.0.0-2070'])).toEqual(['dal-stg-1.0.0-2071', 'stage-latest']);
+  });
+  it('returns null when no tag in the list has a counter', () => {
+    expect(nextTagValue(['stage-latest', 'prod-latest'])).toBeNull();
+    expect(nextTagValue([])).toBeNull();
+  });
+});
+
+describe('review fixes (cubic, PR #7)', () => {
+  const tp = [{ name: 'tag', type: 'tags', flag: '-t', required: true }];
+  it('normalizes string defaults and saved values for a tags param', () => {
+    expect(initFormState([{ ...tp[0], default: 'stage-latest,prod-latest' }])).toEqual({ tag: ['stage-latest', 'prod-latest'] });
+    expect(initFormState(tp, { tag: 'dal-stg-1.0.0-2060' })).toEqual({ tag: ['dal-stg-1.0.0-2060'] });
+  });
+  it('never bumps two counter tags with the same base to the same tag', () => {
+    expect(nextTagValue(['app-01', 'app-02'])).toEqual(['app-03', 'app-04']);
+  });
+  it('counts pending tag text as entered and flags invalid pending text', () => {
+    expect(withPendingTags(tp, { tag: [] }, { tag: '16.4.0' })).toEqual({ values: { tag: ['16.4.0'] }, invalid: false });
+    expect(withPendingTags(tp, { tag: ['a'] }, { tag: 'bad/tag' })).toEqual({ values: { tag: ['a'] }, invalid: true });
+    expect(withPendingTags(tp, { tag: ['a'] }, { tag: '  ' })).toEqual({ values: { tag: ['a'] }, invalid: false });
+  });
+});
+
+describe('review fixes round 2 (cubic, PR #7)', () => {
+  it('keeps a blank multiselect default empty', () => {
+    const mp = [{ name: 'mods', type: 'multiselect', flag: '-m', required: true, default: '' }];
+    expect(initFormState(mp)).toEqual({ mods: [] });
+    expect(buildArgs(mp, initFormState(mp))).toEqual([]);
+    expect(isFormValid(mp, initFormState(mp), 'main')).toBe(false);
+  });
+  it('drops invalid tags from defaults, saved values and old runs', () => {
+    const tp = [{ name: 'tag', type: 'tags', flag: '-t', default: 'ok,bad/tag' }];
+    expect(initFormState(tp)).toEqual({ tag: ['ok'] });
+    expect(initFormState(tp, { tag: ['x', '-lead'] })).toEqual({ tag: ['x'] });
+    expect(argsToValues(tp, JSON.stringify(['-t', 'a,bad/tag']))).toEqual({ tag: ['a'] });
+  });
+});
+
