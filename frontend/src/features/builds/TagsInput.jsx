@@ -1,27 +1,18 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { addTags } from '@/features/builds/buildArgs';
 
-// Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
-const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
-
-// Split typed or pasted text on commas/whitespace into tags, merged into `existing` without duplicates.
-// Entries that aren't valid docker tags come back in `invalid` instead of being added.
-export function addTags(existing, text) {
-  const tags = [...existing];
-  const invalid = [];
-  for (const raw of text.split(/[,\s]+/)) {
-    if (!raw) continue;
-    if (!TAG_RE.test(raw)) invalid.push(raw);
-    else if (!tags.includes(raw)) tags.push(raw);
-  }
-  return { tags, invalid };
-}
-
-export function TagsInput({ id, value, onChange, placeholder, required }) {
+// onDraftChange reports the text not yet turned into a chip, so the form can count it as entered
+// (see withPendingTags) — Build stays usable after typing one tag without pressing Enter.
+export function TagsInput({ id, value, onChange, onDraftChange, placeholder, required }) {
   const tags = Array.isArray(value) ? value : [];
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState('');
   const [error, setError] = useState('');
+  const setDraft = (text) => {
+    setDraftState(text);
+    onDraftChange?.(text);
+  };
 
   const commit = (text) => {
     const { tags: next, invalid } = addTags(tags, text);
@@ -31,7 +22,7 @@ export function TagsInput({ id, value, onChange, placeholder, required }) {
   };
 
   const onKeyDown = (e) => {
-    if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && draft.trim()) {
+    if ((e.key === 'Enter' || e.key === ',') && draft.trim()) {
       e.preventDefault();
       commit(draft);
     } else if (e.key === 'Backspace' && !draft && tags.length) {
@@ -61,7 +52,7 @@ export function TagsInput({ id, value, onChange, placeholder, required }) {
           onBlur={() => draft.trim() && commit(draft)}
           onPaste={(e) => {
             const text = e.clipboardData.getData('text');
-            if (/[,\s]/.test(text.trim())) { e.preventDefault(); commit(draft + text); }
+            if (/[,\s]/.test(text.trim())) { e.preventDefault(); commit(`${draft},${text}`); }
           }}
           placeholder={tags.length ? '' : placeholder || 'Type a tag, press Enter'}
         />

@@ -59,7 +59,7 @@ function ParamCard({ p, i, count, update, move, remove }) {
         <Field label="Flag" htmlFor={id('flag')}><Input id={id('flag')} className="h-10 font-mono" placeholder="-tag" value={p.flag} onChange={(e) => update(i, 'flag', e.target.value)} /></Field>
         <Field label={multi ? 'Default (comma-separated)' : 'Default'} htmlFor={id('default')}>
           {multi ? (
-            <ListInput id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default : []} onChange={(v) => update(i, 'default', v)} />
+            <ListInput id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default : parseList(String(p.default ?? ''))} onChange={(v) => update(i, 'default', v)} />
           ) : (
             <Input id={id('default')} className="h-10" value={Array.isArray(p.default) ? p.default.join(', ') : p.default ?? ''} onChange={(e) => update(i, 'default', e.target.value)} />
           )}

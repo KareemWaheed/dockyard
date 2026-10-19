@@ -95,3 +95,25 @@ describe('NewBuildSheet', () => {
     finish({ runId: 1, buildNumber: 1 });
   });
 });
+
+describe('NewBuildSheet with a tags param', () => {
+  const tagsDef = { name: 'FE', params: [{ name: 'tag', type: 'tags', flag: '-t', label: 'Tag', required: true }] };
+  it('builds with a tag typed but not yet turned into a chip', async () => {
+    api.startBuild.mockResolvedValue({ runId: 3, buildNumber: 12, queued: false });
+    renderWithProviders(<NewBuildSheet project="fe" def={tagsDef} open onOpenChange={vi.fn()} onStarted={vi.fn()} />);
+    const user = userEvent.setup();
+    await screen.findByRole('combobox', { name: 'Branch' });
+    const build = screen.getByRole('button', { name: 'Build & push' });
+    await user.type(screen.getByRole('textbox', { name: /Tag/ }), 'stage-latest{Enter}prod-latest');
+    expect(build).toBeEnabled();
+    await user.click(build);
+    await waitFor(() => expect(api.startBuild).toHaveBeenCalledWith('fe', 'main', ['-t', 'stage-latest,prod-latest']));
+  });
+  it('blocks Build while the field holds an invalid tag', async () => {
+    renderWithProviders(<NewBuildSheet project="fe" def={tagsDef} open onOpenChange={vi.fn()} onStarted={vi.fn()} />);
+    const user = userEvent.setup();
+    await screen.findByRole('combobox', { name: 'Branch' });
+    await user.type(screen.getByRole('textbox', { name: /Tag/ }), 'ok{Enter}bad/tag');
+    expect(screen.getByRole('button', { name: 'Build & push' })).toBeDisabled();
+  });
+});

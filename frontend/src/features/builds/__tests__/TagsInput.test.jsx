@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TagsInput, addTags } from '@/features/builds/TagsInput';
+import { TagsInput } from '@/features/builds/TagsInput';
+import { addTags } from '@/features/builds/buildArgs';
 
 function Harness({ initial = [], onChange = () => {} }) {
   const [tags, setTags] = useState(initial);
@@ -49,5 +50,22 @@ describe('TagsInput', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('bad/tag');
     expect(screen.getByRole('textbox')).toHaveValue('bad/tag');
+  });
+});
+
+describe('TagsInput review fixes (cubic, PR #7)', () => {
+  it('lets Tab move focus on even with invalid text', async () => {
+    render(<><Harness /><button>Next</button></>);
+    await userEvent.type(screen.getByRole('textbox'), 'bad/tag');
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
+  });
+  it('keeps typed text separate from a pasted list', async () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    const input = screen.getByRole('textbox');
+    await userEvent.type(input, 'foo');
+    await userEvent.paste('bar,baz');
+    expect(onChange).toHaveBeenLastCalledWith(['foo', 'bar', 'baz']);
   });
 });

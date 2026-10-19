@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, nextTagValue, tagParamOf, argsToValues } from '@/features/builds/buildArgs';
+import { initFormState, buildArgs, isFormValid, parseArgs, parseJsonArray, parseDeployMeta, deployEnvOf, nextTag, nextTagValue, tagParamOf, argsToValues, withPendingTags } from '@/features/builds/buildArgs';
 
 const params = [
   { name: 'tag', type: 'string', flag: '--tag', label: 'Tag', required: true },
@@ -158,5 +158,21 @@ describe('nextTagValue', () => {
   it('returns null when no tag in the list has a counter', () => {
     expect(nextTagValue(['stage-latest', 'prod-latest'])).toBeNull();
     expect(nextTagValue([])).toBeNull();
+  });
+});
+
+describe('review fixes (cubic, PR #7)', () => {
+  const tp = [{ name: 'tag', type: 'tags', flag: '-t', required: true }];
+  it('normalizes string defaults and saved values for a tags param', () => {
+    expect(initFormState([{ ...tp[0], default: 'stage-latest,prod-latest' }])).toEqual({ tag: ['stage-latest', 'prod-latest'] });
+    expect(initFormState(tp, { tag: 'dal-stg-1.0.0-2060' })).toEqual({ tag: ['dal-stg-1.0.0-2060'] });
+  });
+  it('never bumps two counter tags with the same base to the same tag', () => {
+    expect(nextTagValue(['app-01', 'app-02'])).toEqual(['app-03', 'app-04']);
+  });
+  it('counts pending tag text as entered and flags invalid pending text', () => {
+    expect(withPendingTags(tp, { tag: [] }, { tag: '16.4.0' })).toEqual({ values: { tag: ['16.4.0'] }, invalid: false });
+    expect(withPendingTags(tp, { tag: ['a'] }, { tag: 'bad/tag' })).toEqual({ values: { tag: ['a'] }, invalid: true });
+    expect(withPendingTags(tp, { tag: ['a'] }, { tag: '  ' })).toEqual({ values: { tag: ['a'] }, invalid: false });
   });
 });

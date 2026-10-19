@@ -4,14 +4,49 @@
 // comma-separated value (-t stage-latest,prod-latest) — unlike multiselect, which repeats the flag.
 const isList = (type) => type === 'multiselect' || type === 'tags';
 const splitTags = (v) => String(v).split(',').filter(Boolean);
+// Values saved before a param became 'tags' (or a comma-separated default) may be a plain string.
+const toList = (type, v) => {
+  const list = [].concat(v ?? []);
+  return type === 'tags' ? list.flatMap(splitTags) : list;
+};
+
+// Docker tag grammar: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+
+// Split typed or pasted text on commas/whitespace into tags, merged into `existing` without duplicates.
+// Entries that aren't valid docker tags come back in `invalid` instead of being added.
+export function addTags(existing, text) {
+  const tags = [...existing];
+  const invalid = [];
+  for (const raw of text.split(/[,\s]+/)) {
+    if (!raw) continue;
+    if (!TAG_RE.test(raw)) invalid.push(raw);
+    else if (!tags.includes(raw)) tags.push(raw);
+  }
+  return { tags, invalid };
+}
+
+// Text still being typed in a tags field ({ [paramName]: text }) counts as entered: valid tags are
+// merged into the values; `invalid` is set when any pending text isn't a valid tag (blocks submit).
+export function withPendingTags(params = [], values = {}, pending = {}) {
+  const merged = { ...values };
+  let invalid = false;
+  for (const p of params) {
+    if (p.type !== 'tags' || !pending[p.name]?.trim()) continue;
+    const r = addTags(toList('tags', values[p.name]), pending[p.name]);
+    merged[p.name] = r.tags;
+    if (r.invalid.length) invalid = true;
+  }
+  return { values: merged, invalid };
+}
 
 export function initFormState(params = [], saved = {}) {
   const state = {};
   for (const p of params) {
-    if (isList(p.type)) state[p.name] = [].concat(p.default || []);
+    if (isList(p.type)) state[p.name] = toList(p.type, p.default);
     else if (p.type === 'checkbox') state[p.name] = p.default || false;
     else state[p.name] = p.default || '';
-    if (saved && Object.prototype.hasOwnProperty.call(saved, p.name)) state[p.name] = saved[p.name];
+    if (saved && Object.prototype.hasOwnProperty.call(saved, p.name)) state[p.name] = isList(p.type) ? toList(p.type, saved[p.name]) : saved[p.name];
   }
   return state;
 }
@@ -156,5 +191,12 @@ export function nextTag(tag, knownTags = []) {
 export function nextTagValue(value, knownTags = []) {
   if (!Array.isArray(value)) return value ? nextTag(value, knownTags) : null;
   if (!value.some((t) => splitCounter(t))) return null;
-  return value.map((t) => (splitCounter(t) ? nextTag(t, knownTags) : t));
+  // Each bumped tag joins the known set, so two counter tags with the same base never collide.
+  const used = [...knownTags, ...value];
+  return value.map((t) => {
+    if (!splitCounter(t)) return t;
+    const next = nextTag(t, used);
+    used.push(next);
+    return next;
+  });
 }
